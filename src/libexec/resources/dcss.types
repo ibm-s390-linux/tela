@@ -1,0 +1,8 @@
+system */dcss *: object
+system */dcss */name/:
+system */dcss */begin/: number
+system */dcss */end/: number
+system */dcss */size/: number
+system */dcss */type/:
+system */dcss_count_available/: number
+system */dcss_count_total/: number
