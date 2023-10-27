@@ -49,6 +49,7 @@ system <name>:
     default_hugepagesize: <size>
     transparent_hugepage: <state>
     memtotal: <size>
+    standbytotal: <size>
     hugepages:
       <size>:
         total: <num>
@@ -279,6 +280,14 @@ conditions' in [Test resources](../resources.md)).
   - **`system/mem/swaptotal:`** *(type: number)*
 
     Size in bytes of total swap.
+
+  - **`system/mem/standbytotal`** *(type: number)*
+
+    Size in bytes of physical standby memory.
+
+    Note that when specifying a condition for this attribute in a test YAML
+    file you can use suffixes Ki, Mi, Gi and Ti to indicate sizes in units of
+    KiB, MiB, GiB and TiB.
 
   - **`system/mem/transparent_hugepage:`** *(type: scalar)*
 

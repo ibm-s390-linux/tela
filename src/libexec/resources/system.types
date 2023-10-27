@@ -14,6 +14,7 @@ system */cpu-mf/sampling/min_rate/: number
 system */cpu-mf/sampling/max_rate/: number
 system */mem/memtotal/: number
 system */mem/swaptotal/: number
+system */mem/standbytotal/: number
 system */mem/default_hugepagesize/: number
 system */mem/default_hugepages_total/: number
 system */mem/default_hugepages_free/: number
