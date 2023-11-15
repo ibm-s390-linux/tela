@@ -1,0 +1,5 @@
+system */virtio-scsi-lun *: object
+system */virtio-scsi-lun */scsi_dev/type/: number
+system */virtio-scsi-lun */scsi_dev/scsi_disk/protection_type/: number
+system */virtio-scsi-lun */block_dev/size/: number
+system */virtio-scsi-lun */block_dev/blksize/: number

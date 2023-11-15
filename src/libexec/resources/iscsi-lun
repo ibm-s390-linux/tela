@@ -1,0 +1,196 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# iscsi-lun - collect state for iscsi-lun resources.
+#
+# Copyright IBM Corp. 2023
+#
+# Usage: iscsi-lun [<datafile>]
+#
+# If a YAML datafile was specified, determine characteristics of all mentioned
+# resources. Otherwise list all available resources.
+#
+
+DATAFILE="$1"
+
+LIBEXEC="${TELA_FRAMEWORK:-$(readlink -f $(dirname $0)/../../..)}"/src/libexec
+
+source $LIBEXEC/lib/common.bash || exit 1
+source $LIBEXEC/lib/resource-scsi-device || exit 1
+
+SCSI_BUS="/sys/bus/scsi/devices"
+LUNS=()
+#LUNS[${#LUNS[@]}]="39:40:41:42 ip-1.2.3.4:5678-iscsi-iscsi-target:name-string-lun-iscsi-lun-42"
+
+shopt -s nullglob
+
+function check_block_dev() {
+	local dir="$1" var="$2" bdev size blksize
+
+	[[ -e "$dir" ]] || return
+
+	bdev=${dir##*/}
+	bdev=${bdev#block:}
+
+	# size in sectors (512 byte)
+	read size <$dir/size
+	(( size=size*512 ))
+
+	if [[ -e "$bdevdir/queue/logical_block_size" ]] ; then
+		read blksize <"$dir/queue/logical_block_size"
+	else
+		# Fall back to blockdev but this requires root
+		blksize=$(blockdev --getss /dev/$bdev 2>/dev/null)
+	fi
+
+	echo "  block_dev:"
+	echo "    bdev: $bdev"
+	echo "    size: $size"
+	echo "    blksize: $blksize"
+
+	eval "$var=$bdev"
+}
+
+function get_scsi_dir() {
+	local var=$1 id=$2 lun name iscsi_lun
+
+	for lun in "${LUNS[@]}" ; do
+		set -- $lun
+		name=$1
+		iscsi_lun=$2
+		if [ "$id" = "$iscsi_lun" ]; then
+			eval "$var=$SCSI_BUS/$name"
+			return
+		fi
+	done
+
+	eval "$var="
+}
+
+function check_iscsi_lun() {
+	local id="$1" scsidir value IFS addrport target lun addr port
+
+	get_scsi_dir scsidir $id
+	[[ -z "$scsidir" ]] && return 1
+
+	# Check SCSI state
+	read value <$scsidir/state
+	if [ "$value" != "running" ]; then
+		warn "Ignoring $id due to state: $value"
+		return 1
+	fi
+
+	# parse ID string: ip-${addr}:${port}-iscsi-${target}-lun-${lun}
+	addrport=${id#ip-}
+	addrport=${addrport%%-iscsi-*}
+	target=${id#*-iscsi-}
+	target=${target%-lun-*}
+	lun=${id##*-lun-}
+	IFS=":"
+	set -- $addrport
+	unset IFS
+	addr=$1
+	port=$2
+
+	# Create output
+	echo "iscsi-lun $id:"
+	echo "  id: $id"
+	echo "  ipaddress: $addr"
+	echo "  port: $port"
+	echo "  target: $target"
+	echo "  iscsilun: $lun"
+
+	# Block device information
+	for bdevdir in $scsidir/block/* $scsidir/block:* ; do
+		check_block_dev $bdevdir bdev_name
+		break
+	done
+
+	# SCSI device type information
+	check_scsi_dev "$scsidir" "$bdev_name"
+
+	# Default values for meta-attributes
+	echo "  allow_write: 0"
+
+	return 0
+}
+
+function get_state() {
+	local IFS=$'\n' count=0
+
+	while read -r line ; do
+		[ ${line:0:10} != "iscsi-lun " ] && continue
+		id=${line:10}
+		id="${id%:}"
+
+		check_iscsi_lun "$id" && (( count=count+1 ))
+	done
+	echo "iscsi_lun_count_available: $count"
+}
+
+function enumerate_iscsi_luns() {
+	local id sysreal sdevname subsystem hba iter lun
+	local sessiondev name target transportdev_sysnum
+	local connname conndev addr port suffix
+
+	for sys in /sys/class/scsi_device/*:*:*:*/device/; do
+		sysreal=$(readlink -e $sys)
+		[ -n "${sysreal//*\/session*}" ] && continue # skip others
+		sdevname=${sysreal##*/} # basename
+		lun=${sdevname##*:}
+
+		iter=$sysreal
+		while [ -n "$iter" ]; do
+			# ascend to parent: strip last path part
+			iter=${iter%/*}
+			name=${iter##*/}
+			if [ -z ${name%session*} ]; then
+			    break
+			fi
+		done
+
+		# note: not exactly udev_device_new_from_subsystem_sysname()
+		sessiondev=${iter}/iscsi_session/${name}
+		read target < ${sessiondev}/targetname
+
+		transportdev_sysnum=${name#session}
+		connname=connection${transportdev_sysnum}:0
+		# note: not exactly udev_device_new_from_subsystem_sysname()
+		conndev=${iter}/${connname}/iscsi_connection/${connname}
+		read addr < ${conndev}/persistent_address
+		read port < ${conndev}/persistent_port
+
+		suffix=ip-${addr}:${port}-iscsi-${target}-lun-${lun}
+		# currently only software iSCSI so no HBA prefix
+		id=$suffix
+
+		# Add to LUNS array
+		LUNS[${#LUNS[@]}]="$sdevname $id"
+	done
+}
+
+function get_all() {
+	local do_list=$1 id count=0
+
+	for lun in "${LUNS[@]}" ; do
+		set -- $lun
+		id=$2
+		(( count=count+1 ))
+		[[ $do_list == 1 ]] && echo "iscsi-lun $id:"
+	done
+
+	[[ $do_list == 0 ]] && echo "iscsi_lun_count_total: $count"
+}
+
+enumerate_iscsi_luns
+
+if [ -n "$DATAFILE" ] ; then
+	# Get state for resources specified in datafile
+	get_state <"$DATAFILE"
+	get_all 0
+else
+	# Get list of all available resources
+	get_all 1
+fi
+
+exit 0

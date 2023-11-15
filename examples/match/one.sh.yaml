@@ -1,0 +1,4 @@
+# Request a single dummy resource with no special characteristics
+
+system:
+  dummy my_dummy:

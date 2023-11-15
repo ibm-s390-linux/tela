@@ -1,0 +1,3 @@
+void misc_fn()
+{
+}

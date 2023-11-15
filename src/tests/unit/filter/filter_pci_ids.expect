@@ -1,0 +1,54 @@
+pci 0x00000000:
+pci 0x00000010:
+pci 0x0000000f:
+pci 0x00000008:
+pci 0x00000000:
+pci 0x0000000f:
+pci 0x12345678:
+pci 0xffffffff:
+pci 0x00000001:
+
+pci 0x00000000:
+pci 0x00000010:
+pci 0x0000000f:
+pci 0x00000008:
+pci 0x00000000:
+pci 0x0000000f:
+pci 0x12345678:
+pci 0xffffffff:
+
+pci uid:0x0:
+pci uid:0x10:
+pci uid:0xf:
+pci uid:0x8:
+pci uid:0x0:
+pci uid:0xf:
+pci uid:0x12345678:
+pci uid:0xffffffff:
+
+pci :
+pci ::
+pci x:
+pci 0x:
+pci g:
+pci 123456789:
+pci aaa:0x123:
+pci pci:
+pci pci 1:
+pci 1 pci:
+pci 0x1 0x2:
+
+pci fid:
+pci fid::
+pci fid:x:
+pci fid:0x:
+pci fid:g:
+pci fid:123456789:
+
+pci uid:
+pci uid::
+pci uid:x:
+pci uid:0x:
+pci uid:g:
+pci uid:123456789:
+

@@ -1,0 +1,8 @@
+# Check if test yaml is correctly parsed even with missing newline at end of
+# file.
+# rc:     noeof.rc
+# test:   [ "$TELA_SYSTEM_DUMMY_a_SIZE" == 1 ]
+# result: ^ok[^#]*$
+
+dummy a:
+  size:

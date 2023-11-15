@@ -1,0 +1,7 @@
+test:
+  plan:
+    # Format is <testname>: "<description>"
+    rc: "Check for unexpected return code"
+    no_warnings: "Check for unexpected warnings"
+    missing_expand: "Check for expected expansions that did not happen"
+    invalid_expand: "Check for unexpected expansions that happened"

@@ -1,0 +1,4 @@
+# Check if a single non-existing tool entry is handled correctly.
+
+tools:
+  tela_this_tool_does_not_exist:

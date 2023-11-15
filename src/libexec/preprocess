@@ -1,0 +1,120 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# preprocess - tool to expand associated resources in test resource YAML files.
+#
+# Copyright IBM Corp. 2023
+#
+# Usage: preprocess <sysin>
+#
+# Perform processing on YAML file SYSIN that needs to occur on the target
+# system and before running the system resource script.
+#
+# Note that preprocessing is performed on the target system.
+#
+# Implemented rules:
+#   - List chpids associated with dasd (resource only):
+#       dasd 0.0.0001:
+#         to
+#       chpid 0.10:
+#       chpid 0.11:
+#       ...
+#   - List chpid associated with zfcp-host (resource only):
+#       zfcp-host 0.0.0001:
+#         to
+#       chpid 0.10:
+#   - List chpid associated with qeth:
+#       qeth 0.0.0001:
+#         to
+#       chpid 0.10:
+#
+
+FILENAME=$1
+
+LIBEXEC="${TELA_FRAMEWORK:-$(readlink -f $(dirname $0)/../..)}"/src/libexec
+
+source $LIBEXEC/lib/common.bash || exit 1
+
+if [[ -z "$FILENAME" ]] ; then
+	die "Missing sysin parameter"
+fi
+
+# Print information for single CHPID. Ensure that no duplicate information is
+# printed.
+function print_chpid() {
+	local chpid=$1 ind=$2 cssid=$3
+
+	# Ensure that each combination of CHPID and indentation level
+	# is only processed once
+	eval "[[ -n \$done2_${chpid}_${ind} ]] && return ;
+		done2_${chpid}_${ind}=1"
+
+	printf "%*schpid %s.%s:\n" $ind "" $cssid $chpid
+}
+
+# Process CHPID data in "raw" format.
+function print_chpids_raw() {
+	local raw=$1 IFS="_"
+
+	set -- $raw
+
+	# Print CHPID data if the corresponding PIM bit is set
+	[[ $(( 0x$9 & 0x80 )) != 0 ]] && print_chpid $1 ${10} ${11}
+	[[ $(( 0x$9 & 0x40 )) != 0 ]] && print_chpid $2 ${10} ${11}
+	[[ $(( 0x$9 & 0x20 )) != 0 ]] && print_chpid $3 ${10} ${11}
+	[[ $(( 0x$9 & 0x10 )) != 0 ]] && print_chpid $4 ${10} ${11}
+	[[ $(( 0x$9 & 0x08 )) != 0 ]] && print_chpid $5 ${10} ${11}
+	[[ $(( 0x$9 & 0x04 )) != 0 ]] && print_chpid $6 ${10} ${11}
+	[[ $(( 0x$9 & 0x02 )) != 0 ]] && print_chpid $7 ${10} ${11}
+	[[ $(( 0x$9 & 0x01 )) != 0 ]] && print_chpid $8 ${10} ${11}
+}
+
+# Add CHPID information for CDEV to array VAR. Data is added in a "raw" format
+# that can be used as environment variable name.
+function get_chpids_raw() {
+	local var=$1 cdev="$2" ind=$3 c1 c2 c3 c4 c5 c6 c7 c8 pim pampom IFS
+	local schdir="/sys/bus/ccw/devices/$cdev/../" cssid=${cdev%%.*}
+
+	read c1 c2 c3 c4 c5 c6 c7 c8 2>/dev/null <"$schdir/chpids" || return
+	read pim pampom 2>/dev/null <"$schdir/pimpampom" || return
+
+	eval "$var+=(${c1}_${c2}_${c3}_${c4}_${c5}_${c6}_${c7}_${c8}_${pim}_${ind}_${cssid})"
+}
+
+IFS=$'\n'
+all_chpids=()
+while read -r line ; do
+	indent="${line%%[![:space:]]*}"
+	line=${line#"$indent"}
+
+	case "$line" in
+	"dasd "*)
+		ID=${line#dasd }
+		ID="${ID%:}"
+		get_chpids_raw all_chpids "$ID" ${#indent}
+		echo "${indent}dasd $ID:"
+		;;
+	"zfcp-host "*)
+		ID=${line#zfcp-host }
+		ID="${ID%:}"
+		get_chpids_raw all_chpids "$ID" ${#indent}
+		echo "${indent}zfcp-host $ID:"
+		;;
+	"qeth "*)
+		ID=${line#qeth }
+		ID="${ID%:}"
+		get_chpids_raw all_chpids "$ID" ${#indent}
+		echo "${indent}qeth $ID:"
+		;;
+	*) echo "${indent}${line}" ;;
+	esac
+done <"$FILENAME"
+
+# Create output for collected list of CHPIDs
+for chpids in ${all_chpids[@]} ; do
+	# Ensure that each combination of CHPID set and indentation level
+	# is only processed once
+	eval "[[ -n \$done1_${chpids} ]] && continue ; done1_${chpids}=1"
+
+	print_chpids_raw $chpids
+done

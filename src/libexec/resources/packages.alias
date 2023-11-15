@@ -1,0 +1,35 @@
+# This file contains mappings (one per line) to map base package names to OS
+# specific package names. The line format is as follows:
+#
+#   <base>: <os_id>[-<os_version>]:<alternate> ...
+#
+# where
+#
+#   <base>:       Base package name as specified in test YAML
+#   <os_id>:      OS ID of the OS for which this name applies
+#   <os_version>: Optional OS version for the OS for which this name applies
+#   <alternate>:  Alternate name to use for this package on the specified OS
+#
+# Notes:
+#   - One line can contain entries for multiple operating systems
+#   - Mappings with OS ID and version must be specified before
+#     OS ID-only mappings.
+#   - OS versions can be specified partially (e.g. 7 to match all OS versions
+#     starting with 7 such as 7.0, 7.1, etc)
+#   - One <alternate> can contain multiple packages separated by the pipe
+#     symbol ('|')
+#   - If multiple packages are given the version of the first package is used
+#     as the version of the alias
+#   - If multiple packages are defined, all packages need to be present or
+#     otherwise the alias counts as not installed
+#
+
+boost: ubuntu:libboost-all-dev
+lua-libs: fedora:lua-libs ubuntu:liblua5.4-0|liblua5.3-0 rhel:lua-libs
+perf: ubuntu:linux-tools debian:linux-tools
+perl: fedora:perl-interpreter linuxonzdriver:perl-interpreter
+qemu: fedora:qemu-system-s390x linuxonzdriver:qemu-system-s390x ubuntu:qemu-system-s390x rhel:qemu-kvm
+s390-tools: ubuntu:s390-tools fedora:s390utils-base rhel:s390utils-base sles:s390-tools
+systemd-udev: ubuntu:udev
+ziomon: fedora:s390utils-ziomon rhel:s390utils-ziomon sles:s390-tools ubuntu:s390-tools
+zlib-devel: ubuntu:zlib1g-dev

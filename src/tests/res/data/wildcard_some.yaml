@@ -1,0 +1,10 @@
+# Check if wildcard requirement with attribute requirement matches.
+#
+# test:   [ "$TELA_SYSTEM_DUMMY_0_SIZE" == 2 ]
+# test:   [ "$TELA_SYSTEM_DUMMY_1_SIZE" == 3 ]
+# test:   [ -z "$TELA_SYSTEM_DUMMY_2_SIZE" ]
+# result: ^ok[^#]*$
+# rc: triple.rc
+
+dummy *:
+  size: >1

@@ -1,0 +1,6 @@
+system */scm *: object
+system */scm */opstate/: number
+system */scm */block_dev/blksize/: number
+system */scm */block_dev/size/: number
+system */scm_count_available/: number
+system */scm_count_total/: number

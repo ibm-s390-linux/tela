@@ -1,0 +1,10 @@
+# Check if localhost and remote requirements are only matched against resources
+# of the same type.
+#
+# test:   [ "$TELA_SYSTEM" == "localhost" ]
+# test:   [ "$TELA_SYSTEM_remote" == "remote" ]
+# result: ^ok[^#]*$
+# rc:     syslocal.rc
+
+system localhost:
+system remote:

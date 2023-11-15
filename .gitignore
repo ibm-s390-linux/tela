@@ -1,0 +1,8 @@
+*.log
+*.o
+.*.swp
+src/tela
+examples/day
+examples/dev_null
+doc/*.html
+doc/resources/*.html

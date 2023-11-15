@@ -1,0 +1,5 @@
+# Request all available dummy resources, but at least 2
+
+system:
+  dummy *:
+  dummy_count_available: >=2

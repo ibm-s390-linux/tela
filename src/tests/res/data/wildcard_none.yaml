@@ -1,0 +1,8 @@
+# Check if wildcard requirement matches no objects.
+#
+# test:   [ -z "$TELA_SYSTEM_DUMMY_0_SIZE" ]
+# result: ^ok[^#]*$
+# rc: triple.rc
+
+dummy *:
+  size: 100

@@ -1,0 +1,12 @@
+system */qeth *: object
+system */qeth */layer2/: number
+system */qeth */portno/: number
+system */qeth */netdev/speed/: number
+system */qeth_count_available/: number
+system */qeth_count_total/: number
+
+# Copied from chpid resource object
+system */qeth */chpid *: object
+system */qeth */chpid */type/: number
+system */qeth */chpid */pnetid *: object
+system */qeth */chpid */pnetid_count/: number

@@ -1,0 +1,6 @@
+system */chpid *: object
+system */chpid */type/: number
+system */chpid */pnetid *: object
+system */chpid */pnetid_count/: number
+system */chpid_count_available/: number
+system */chpid_count_total/: number

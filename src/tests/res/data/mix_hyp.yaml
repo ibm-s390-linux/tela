@@ -1,0 +1,6 @@
+# Check if mix of empty hypervisor and resource requirements work
+# result: ^ok[^#]*$
+
+system:
+  hypervisor:
+  dummy a:

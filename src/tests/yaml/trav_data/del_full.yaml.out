@@ -1,0 +1,34 @@
+Before (root=non-null):
+==================================
+  delete:
+  delete:
+  delete:
+  delete:
+    delete:
+      delete:
+  delete:
+  delete:
+  delete:
+==================================
+
+Callback:
+==================================
+delete                                  : delete:
+*** Deleting node
+delete                                  : delete:
+*** Deleting node
+delete                                  : delete:
+*** Deleting node
+delete                                  : delete:
+*** Deleting node
+delete                                  : delete:
+*** Deleting node
+delete                                  : delete:
+*** Deleting node
+delete                                  : delete:
+*** Deleting node
+==================================
+
+After (root=null):
+==================================
+==================================

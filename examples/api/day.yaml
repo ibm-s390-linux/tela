@@ -1,0 +1,4 @@
+# Needed because the test executable implements more than one testcase
+
+test:
+  plan: 4

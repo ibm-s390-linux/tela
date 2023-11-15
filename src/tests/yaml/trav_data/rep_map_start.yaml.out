@@ -1,0 +1,22 @@
+Before (root=non-null):
+==================================
+  replace:
+    child1:
+  map2:
+    child2:
+==================================
+
+Callback:
+==================================
+replace                                 : replace:
+*** Replacing node
+map2                                    : map2:
+map2/child2                             :   child2:
+==================================
+
+After (root=non-null):
+==================================
+  replacement
+  map2:
+    child2:
+==================================

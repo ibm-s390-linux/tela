@@ -1,0 +1,18 @@
+test:
+  plan:
+    silent_0: "No output, exit code 0"
+    stdout_0: "Output on stdout, exit code 0"
+    stderr_0: "Output on stderr, exit code 0"
+    all_0: "Output on both stdout and stderr, exit code 0"
+    silent_1: "No output, exit code 1"
+    stdout_1: "Output on stdout, exit code 1"
+    stderr_1: "Output on stderr, exit code 1"
+    all_1: "Output on both stdout and stderr, exit code 1"
+    quote: "Collect quoted output, check for warnings, non-zero exit code"
+    quote2: "Check that parameter quoting works as expected"
+    quote_white_space1: "Check that parameters with white spaces are properly quoted (part1)"
+    quote_white_space2: "Check that parameters with white spaces are properly quoted (part2)"
+    stdout_file_exists: "Check that stdout file exists"
+    stderr_file_exists: "Check that stderr file exists"
+    run_cmd_env_variables_set: "Check that TELA_RUN_CMD_(STDOUT|STDERR) is set"
+    multiline_cmd: "Check that eval can access the outer scope and that multiline cmd can be used"

@@ -1,0 +1,305 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# filter - tool to expand shortcuts in resource and requirements YAML files.
+#
+# Copyright IBM Corp. 2023
+#
+# Usage: filter <yaml-file>|- <resource>
+#
+# Apply normalization rules to the YAML file. <resource> must be 1 if the
+# YAML file represents a resource file, 0 if the file is a testcase file.
+# Read YAML file from standard input if specified as "-".
+#
+# Note that the filter step is not necessarily performed on the target system.
+#
+# Implemented rules:
+#   - Shortcut for cpu:
+#	cpus: num
+#	  to
+#	cpus:
+#	  online: num
+#   - Shortcut for mem:
+#	mem: x
+#	  to
+#	mem:
+#	  memtotal: x
+#   - Shortcut for hypervisor:
+#	hypervisor: x
+#	  to
+#	hypervisor:
+#	  type: x
+#   - Shortcut for kernel:
+#	kernel: x
+#	  to
+#	kernel:
+#	  version: x
+#   - Shortcut for tools:
+#       tools: x
+#         to
+#       tools:
+#         x:
+#   - Shortcut for dasd (resource only):
+#       dasd 1:
+#         to
+#       dasd 0.0.0001:
+#   - Shortcut for zfcp-host (resource only):
+#       zfcp-host 1:
+#         to
+#       zfcp-host 0.0.0001:
+#   - Shortcut for qeth (resource only):
+#       qeth 1:
+#         to
+#       qeth 0.0.0001:
+#   - Shortcut for chpid (resource only):
+#       chpid 1:
+#         to
+#       chpid 0.01:
+#   - Shortcut for pci (resource only):
+#       pci 0x1:
+#         to
+#       pci 0x00000001:
+#       pci fid:0x1:
+#         to
+#       pci 0x00000001:
+#       pci uid:0x00001:
+#         to
+#       pci uid:0x1:
+#   -shortcut for scm (resource only):
+#       scm 0:
+#         to
+#       scm 0000000000000000:
+#
+
+FILENAME=$1
+RESOURCE=$2
+
+LIBEXEC="${TELA_FRAMEWORK:-$(readlink -f $(dirname $0)/../..)}"/src/libexec
+
+source $LIBEXEC/lib/common.bash || exit 1
+
+if [[ -z "$FILENAME" ]] ; then
+	die "Missing resource file parameter"
+fi
+
+if [[ -z "$RESOURCE" ]] ; then
+	die "Missing resource indicator parameter"
+fi
+
+function filter_pci() {
+	local indent="$1" line="$2" str ids num_ids id_type id_num id_len
+
+	# pci 0x12345678: # comment
+	# pci fid:0x12345678:
+	# pci uid:0x12345678:
+
+	# Remove pci keyword and any comments
+	str="${line#pci}"
+	str="${str%%#*}"
+
+	# Split ID components
+	IFS=$'\t :' read -r -a ids <<<"${str}"
+
+	# Evaluate ID components
+	num_ids="${#ids[@]}"
+	id_type=""
+	id_num=""
+	id_len=0
+	if [[ "$num_ids" -lt 1 ]] || [[ "$num_ids" -gt 2 ]] ; then
+		:
+	elif [[ "$num_ids" -eq 1 ]] ; then
+		# Default to FID format
+		id_type="fid"
+		id_num="${ids[0]}"
+		id_len=8
+	elif [[ "${ids[0]}" == "fid" ]] ; then
+		id_type="fid"
+		id_num="${ids[1]}"
+		id_len=8
+	elif [[ "${ids[0]}" == "uid" ]] ; then
+		id_type="uid"
+		id_num="${ids[1]}"
+	fi
+
+	id_num="${id_num#0x}"
+
+	if [[ "${#ids[@]}" -gt 2 ]] || [[ "$id_type" == "" ]] ||
+	   ! [[ "$id_num" =~ ^[0-9a-f]+$ ]] || [[ "${#id_num}" -gt 8 ]] ; then
+		# Unsupported format
+		echo "$indent$line"
+	elif [[ "$id_type" == "fid" ]] ; then
+		# FID format
+		printf "%spci 0x%0*x:\n" "$indent" "$id_len" \
+		       "$(( 0x$id_num ))"
+	else
+		# UID format
+		printf "%spci %s:0x%0*x:\n" "$indent" "$id_type" "$id_len" \
+		       "$(( 0x$id_num ))"
+	fi
+}
+
+function map_remove() {
+	local ind=$1 last_ind
+
+	while [ ${#indents[@]} -gt 0 ] ; do
+		last_ind=${indents[${#indents[@]}-1]}
+
+		# Return if current indent is higher than last indent
+		[ $ind -gt $last_ind ] && return
+
+		# Remove last elements from indents and maps
+		unset indents[${#indents[@]}-1]
+		unset maps[${#maps[@]}-1]
+	done
+}
+
+function map_add() {
+	local ind=$1 map=$2
+
+	indents+=( $ind )
+	maps+=( "$map" )
+}
+
+maps=()
+indents=()
+IFS=$'\n'
+
+while read -r line ; do
+	# Remove leading comments and save as indentation
+	indent="${line%%[![:space:]]*}"
+	line="${line#"$indent"}"
+
+	# Remove trailing comments
+	line="${line%%#*}"
+
+	# Remove trailing whitespace
+	line="${line%"${line##*[![:space:]]}"}"
+
+	# Reduced indentation indicates end of a previous mapping except for
+	# empty lines which will be folded
+	! [[ -z "$line" ]] && map_remove ${#indent}
+
+	# Only expand at toplevel or direct child of a system object
+	do_expand=0
+	[[ "${#maps[@]}" -eq 0 ]] && do_expand=1
+	[[ "${#maps[@]}" -eq 1 ]] && [[ "${maps[0]}" =~ ^system ]] && do_expand=1
+
+	# Add mapping key in case of block map start
+	[[ $line =~ :$ ]] && map_add ${#indent} "$line"
+
+	if [[ "$do_expand" == 0 ]] ; then
+		echo "${indent}${line}"
+		continue
+	fi
+
+	case "$line" in
+	"cpus: "*)
+		online=${line#cpus: }
+		if test -z "$online"; then
+			echo "${indent}${line}"
+		else
+			echo "${indent}cpus:"
+			echo "${indent}  online: $online"
+		fi
+		;;
+	"mem: "*)
+		memtotal=${line#mem: }
+		if test -z "$memtotal"; then
+			echo "${indent}${line}"
+		else
+			echo "${indent}mem:"
+			echo "${indent}  memtotal: $memtotal"
+		fi
+		;;
+	"hypervisor: "*)
+		type=${line#hypervisor: }
+		if test -z "$type"; then
+			echo "${indent}${line}"
+		else
+			echo "${indent}hypervisor:"
+			echo "${indent}  type: $type"
+		fi
+		;;
+	"kernel: "*)
+		version=${line#kernel: }
+		if test -z "$version"; then
+			echo "${indent}${line}"
+		else
+			echo "${indent}kernel:"
+			echo "${indent}  version: $version"
+		fi
+		;;
+	"tools: "*)
+		tool=${line#tools: }
+		if [ -z "$tool" ] ; then
+			echo "${indent}${line}"
+		else
+			echo "${indent}tools:"
+			echo "${indent}  $tool:"
+		fi
+		;;
+	"dasd "*)
+		if [ "$RESOURCE" != "1" ] ; then
+			echo "${indent}${line}"
+		else
+			ID=${line#dasd }
+			ID="${ID%:}"
+			if canonical_ccwdev_id ID "$ID" ; then
+				echo "${indent}dasd $ID:"
+			fi
+		fi
+		;;
+	"zfcp-host "*)
+		if [ "$RESOURCE" != "1" ] ; then
+			echo "${indent}${line}"
+		else
+			ID=${line#zfcp-host }
+			ID="${ID%:}"
+			if canonical_ccwdev_id ID "$ID" ; then
+				echo "${indent}zfcp-host $ID:"
+			fi
+		fi
+		;;
+	"qeth "*)
+		if [ "$RESOURCE" != "1" ] ; then
+			echo "${indent}${line}"
+		else
+			ID=${line#qeth }
+			ID="${ID%:}"
+			if canonical_ccwdev_id ID "$ID" ; then
+				echo "${indent}qeth $ID:"
+			fi
+		fi
+		;;
+	"chpid "*)
+		if [ "$RESOURCE" != "1" ] ; then
+			echo "${indent}${line}"
+		else
+			ID=${line#chpid }
+			ID="${ID%:}"
+			if canonical_chpid ID "$ID" ; then
+				echo "${indent}chpid $ID:"
+			fi
+		fi
+		;;
+	"pci "*)
+		if [ "$RESOURCE" != "1" ] ; then
+			echo "${indent}${line}"
+		else
+			filter_pci "$indent" "$line"
+		fi
+		;;
+	"scm "*)
+		if [ "$RESOURCE" != "1" ] ; then
+			echo "${indent}${line}"
+		else
+			ID=${line#scm }
+			ID="${ID%:}"
+			if printf -v ID "%016x" $(( 0x$ID )) 2>/dev/null ; then
+				echo "${indent}scm $ID:"
+			fi
+		fi
+		;;
+	*) echo "${indent}${line}" ;;
+	esac
+done < <(cat "$FILENAME" ; echo)

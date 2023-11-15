@@ -1,0 +1,14 @@
+# Check if sub-objects wildcard + non-wildcard matching works correctly.
+#
+# test:   [ "$TELA_SYSTEM_DUMMY_a_SIZE" == 2 ]
+# test:   [ "$TELA_SYSTEM_DUMMY_a_SUB_0_SIZE" == 5 ]
+# test:   [ -z "$TELA_SYSTEM_DUMMY_a_SUB_1_SIZE" ]
+# test:   [ "$TELA_SYSTEM_DUMMY_a_SUB_b_SIZE" == 4 ]
+# result: ^ok[^#]*$
+# rc: sub.rc
+
+dummy a:
+  sub *:
+    size: >3
+  sub b:
+    size: 4

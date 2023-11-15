@@ -1,0 +1,6 @@
+Running 4 tests
+(1/4) a ............................. [pass]
+(2/4) b.sh .......................... [pass]
+(3/4) dir1/c ........................ [pass]
+(4/4) dir1/d.sh ..................... [pass]
+4 tests executed, 4 passed, 0 failed, 0 skipped

@@ -1,0 +1,8 @@
+system */dummy *: object
+system */dummy */size/: number
+system */dummy */value/: number
+system */dummy */version/: version
+system */dummy */sub *: object
+system */dummy */sub */size/: number
+system */dummy_count_available/: number
+system */dummy_count_total/: number

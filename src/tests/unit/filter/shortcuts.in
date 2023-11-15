@@ -1,0 +1,79 @@
+# This is a sample YAML file for testing tela's YAML shortcut expansion for
+# test resource files.
+#
+# Lines containing shortcuts that must be expanded contain the 'doexpand'
+# keyword. Lines containing shortcuts that must not be expanded contain the
+# 'noexpand' keyword.
+
+# Instances that must be expanded
+
+cpus: doexpand
+mem: doexpand
+hypervisor: doexpand
+kernel: doexpand
+tools: doexpand
+
+system: 
+  cpus: doexpand
+  mem: doexpand
+  hypervisor: doexpand
+  kernel: doexpand
+  tools: doexpand
+
+system localhost:
+  cpus: doexpand
+  mem: doexpand
+  hypervisor: doexpand
+  kernel: doexpand
+  tools: doexpand
+
+system remote:
+  cpus: doexpand
+  mem: doexpand
+  hypervisor: doexpand
+  kernel: doexpand
+  tools: doexpand
+  root0:
+    root1:
+     root2:
+              root3:
+  cpus: doexpand
+
+# Instances that must not be expanded
+
+system:
+  root0:
+    cpus: noexpand
+    mem: noexpand
+    hypervisor: noexpand
+    kernel: noexpand
+    tools: noexpand
+  
+    tools: noexpand
+
+root: 
+  cpus: noexpand
+  mem: noexpand
+  hypervisor: noexpand
+
+root:	
+  kernel: noexpand
+  tools: noexpand
+
+
+root:
+  root:
+    cpus: noexpand
+    mem: noexpand
+    hypervisor: noexpand
+    kernel: noexpand
+    tools: noexpand
+
+root:
+  root:
+    root:
+      cpus: noexpand
+      mem: noexpand
+      hypervisor: noexpand
+      kernel: noexpand
+      tools: noexpand

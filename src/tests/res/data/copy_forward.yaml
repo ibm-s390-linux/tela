@@ -1,0 +1,9 @@
+# Check if value of "value" attribute is correctly copied from dummy 2 if
+# the reference is listed before the source.
+
+# test:   [ "$TELA_SYSTEM_DUMMY_a_VALUE" == 3 ]
+# result: ^ok[^#]*$
+# rc: copy4.rc
+
+dummy a:
+  id: 1

@@ -1,0 +1,27 @@
+Before (root=non-null):
+==================================
+  map1:
+    child1:
+  delete:
+    child2:
+  map3:
+    child3:
+==================================
+
+Callback:
+==================================
+map1                                    : map1:
+map1/child1                             :   child1:
+delete                                  : delete:
+*** Deleting node
+map3                                    : map3:
+map3/child3                             :   child3:
+==================================
+
+After (root=non-null):
+==================================
+  map1:
+    child1:
+  map3:
+    child3:
+==================================

@@ -1,0 +1,104 @@
+#!/bin/bash
+#
+# This script collects the state for scm resources.
+#
+# Usage: scm [<datafile>]
+#
+# If a YAML datafile was specified, determine characteristics of all mentioned
+# resources. Otherwise list all available resources.
+#
+
+DATAFILE="$1"
+
+SCM="/sys/bus/scm/drivers/scm_block"
+
+shopt -s nullglob
+
+function check_block_dev() {
+	local dir="$1" bdev size blksize=0
+
+	[[ -e "$dir" ]] || return
+
+	bdev=${dir##*/}
+	bdev=${bdev#block:}
+
+	echo "  block_dev:"
+	echo "    bdev: $bdev"
+
+	# size in sectors (512 byte)
+	read -r size <"$dir"/size
+	(( size=size*512 ))
+
+	if [[ -e "$bdevdir/queue/logical_block_size" ]] ; then
+		read -r blksize <"$dir/queue/logical_block_size"
+	fi
+
+	echo "    size: $size"
+	echo "    blksize: $blksize"
+}
+
+function check_scm() {
+	local id="$1" sysfs bdev opstate
+
+	sysfs="$SCM/$id"
+
+	[[ -e "$sysfs" ]] || return 1
+
+	# Create output
+	echo "scm $id:"
+	echo "  busid: $id"
+	echo "  sysfs: $sysfs"
+
+	read -r opstate <"$sysfs/oper_state"
+	echo "  opstate: $opstate"
+
+	# Block device information
+	for bdevdir in "$sysfs"/block/* "$sysfs"/block:* ; do
+	      check_block_dev "$bdevdir"
+	      break
+	done
+
+	# Default values for meta-attributes
+	echo "  allow_write: 0"
+
+	return 0
+}
+
+function get_state() {
+	local IFS=$'\n' count=0
+
+	while read -r line ; do
+		[[ ${line:0:4} == "scm " ]] && (( count++ ))
+		id=${line:4}
+		id="${id%:}"
+
+		check_scm "$id" && (( count=count+1 ))
+	done
+
+	echo "scm_count_available: $count"
+}
+
+function list_all() {
+	local do_list="$1" sysfs base count=0
+
+	for sysfs in "$SCM"/* ; do
+		base=${sysfs##*/}
+		if [[ ${#base} == 16 ]] ; then
+			(( count=count+1 ))
+			[[ "$do_list" == 1 ]] && echo "scm $base:"
+		fi
+	done
+
+	[[ "$do_list" == 0 ]] && echo "scm_count_total: $count"
+}
+
+if [[ -n "$DATAFILE" ]] ; then
+	# Get state for resources in specified datafile
+	get_state <"$DATAFILE"
+	list_all 0
+else
+	# Get list of all available resources
+	list_all 1
+fi
+
+exit 0

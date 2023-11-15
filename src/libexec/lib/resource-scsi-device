@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: MIT
+# resource-scsi-device - SCSI-related function for use in resource scripts
+#
+# Copyright IBM Corp. 2023
+#
+# library for scsi device sub-resources common to multiple top-level resources
+#
+
+function check_scsi_dev() {
+	local dir="$1" bdev="$2" hctl wwid vendor model t host channel target
+	local lun IFS
+	local prot=0 thin=0
+
+	[[ -d "$dir/" ]] || return
+
+	hctl=${dir##*/}
+
+	IFS=:
+	set -- $hctl
+	unset IFS
+	host=$1
+	channel=$2
+	target=$3
+	lun=$4
+
+	read wwid 2>/dev/null < "$dir/wwid"
+	if [[ -z "$wwid" ]] ; then
+		# Fall back to scsi_id output
+		read wwid 2>/dev/null < <(/sbin/scsi_id -g -s /block/$bdev)
+	fi
+	if [[ -z "$wwid" ]] ; then
+		# Fall back to scsi_id output (new version)
+		read wwid 2>/dev/null < <(/lib/udev/scsi_id  --whitelisted --device=/dev/$bdev)
+	fi
+	read vendor 2>/dev/null < "$dir/vendor"
+	read model 2>/dev/null < "$dir/model"
+	read t 2>/dev/null < "$dir/type"
+
+	echo "  scsi_dev:"
+	echo "    sysfs: $dir"
+	echo "    hctl: $hctl"
+	echo "    host: $host"
+	echo "    channel: $channel"
+	echo "    target: $target"
+	echo "    lun: $lun"
+	[[ -n "$wwid" ]] && echo "    wwid: $wwid"
+	echo "    vendor: $vendor"
+	echo "    model: $model"
+	echo "    type: $t"
+
+	if [[ "$t" -eq 0 ]]; then
+		read prot 2>/dev/null < "$dir/scsi_disk/$hctl/protection_type"
+		read thin 2>/dev/null < "$dir/scsi_disk/$hctl/thin_provisioning"
+		echo "    scsi_disk:"
+		echo "      protection_type: $prot"
+		echo "      thin_provisioning: $thin"
+	fi
+}

@@ -1,0 +1,8 @@
+# Check if wildcard requirement works with failing non-wildcard requirement.
+#
+# result: ^ok.*# SKIP Missing dummy a
+# rc: triple.rc
+
+dummy a:
+   value: >3
+dummy *:

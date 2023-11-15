@@ -1,0 +1,82 @@
+Before (a=non-null, b=non-null):
+= a ===============================
+  root:
+    map1: key2
+    map2:
+      map3:
+        key3:
+    map4:
+    replace_a:
+      - seq 1
+      - seq 2
+    map6: scalar 1 scalar 2
+= b ===============================
+  root:
+    map1: key2
+    map2:
+      map3:
+        key3:
+    map4:
+    map5:
+      - seq 1
+      - seq 2
+    map6: scalar 1 scalar 2
+==================================
+
+Callback:
+==================================
+a: root                                    : root:
+b: root                                    : root:
+a: root/map1                               :   map1:
+b: root/map1                               :   map1:
+a: root/map1/                              :     key2
+b: root/map1/                              :     key2
+a: root/map2                               :   map2:
+b: root/map2                               :   map2:
+a: root/map2/map3                          :     map3:
+b: root/map2/map3                          :     map3:
+a: root/map2/map3/key3                     :       key3:
+b: root/map2/map3/key3                     :       key3:
+a: root/map4                               :   map4:
+b: root/map4                               :   map4:
+a: root/replace_a                          :   replace_a:
+*** Replacing node
+b: <null>
+a: root/map6                               :   map6:
+b: root/map6                               :   map6:
+a: root/map6/                              :     scalar 1 scalar 2
+b: root/map6/                              :     scalar 1 scalar 2
+a: <null>
+b: root/map5                               :   map5:
+a: <null>
+b: root/map5/seq 1                         :     -
+a: <null>
+b: root/map5/seq 1/                        :       seq 1
+a: <null>
+b: root/map5/seq 2                         :     -
+a: <null>
+b: root/map5/seq 2/                        :       seq 2
+==================================
+
+After (a=non-null, b=non-null):
+= a ==============================
+  root:
+    map1: key2
+    map2:
+      map3:
+        key3:
+    map4:
+    replacement
+    map6: scalar 1 scalar 2
+= b ==============================
+  root:
+    map1: key2
+    map2:
+      map3:
+        key3:
+    map4:
+    map5:
+      - seq 1
+      - seq 2
+    map6: scalar 1 scalar 2
+==================================

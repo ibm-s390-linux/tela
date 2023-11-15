@@ -1,0 +1,19 @@
+  ---
+  my: data
+  my2: data2
+  ...
+  ---
+    multiline: |2
+      line1
+      line2
+  ...
+  ---
+  hex: |2
+    line1\x01
+    \xffline2
+  ...
+  ---
+  empty: ""
+  ...
+  ---
+  ...

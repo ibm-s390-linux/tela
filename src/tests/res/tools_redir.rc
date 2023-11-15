@@ -1,0 +1,3 @@
+system:
+  tools:
+    true: /bin/sh

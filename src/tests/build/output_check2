@@ -1,0 +1,5 @@
+  CC      src/tests/build/a
+Running 1 tests
+(1/1) a ............................. [pass]
+1 tests executed, 1 passed, 0 failed, 0 skipped
+Result log stored in /home/root/git/tela-kernel/tela/src/tests/build/test.log

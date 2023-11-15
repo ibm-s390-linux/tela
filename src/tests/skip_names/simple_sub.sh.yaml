@@ -1,0 +1,7 @@
+system:
+  dummy x:
+    nonexistent: 1
+
+test:
+  plan:
+    test1: "desc for test1"

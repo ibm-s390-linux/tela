@@ -1,0 +1,59 @@
+# Valid untyped format
+pci 0:
+pci 10:
+pci f:
+pci 08:
+pci 0x0:
+pci 0xf:
+pci 0x12345678:
+pci 0xffffffff:
+pci 1 :
+
+# Valid FID format
+pci fid:0:
+pci fid:10:
+pci fid:f:
+pci fid:08:
+pci fid:0x0:
+pci fid:0xf:
+pci fid:0x12345678:
+pci fid:0xffffffff:
+
+# Valid UID format
+pci uid:0:
+pci uid:10:
+pci uid:f:
+pci uid:08:
+pci uid:0x0:
+pci uid:0xf:
+pci uid:0x12345678:
+pci uid:0xffffffff:
+
+# Invalid untyped format
+pci :
+pci ::
+pci x:
+pci 0x:
+pci g:
+pci 123456789:
+pci aaa:0x123:
+pci pci:
+pci pci 1:
+pci 1 pci:
+pci 0x1 0x2:
+
+# Invalid FID format
+pci fid:
+pci fid::
+pci fid:x:
+pci fid:0x:
+pci fid:g:
+pci fid:123456789:
+
+# Invalid UID format
+pci uid:
+pci uid::
+pci uid:x:
+pci uid:0x:
+pci uid:g:
+pci uid:123456789:

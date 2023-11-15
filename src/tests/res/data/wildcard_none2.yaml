@@ -1,0 +1,13 @@
+# Check if wildcard requirement matching no remaining resource works.
+#
+# test:   [ "$TELA_SYSTEM_DUMMY_a_SIZE" == 1 ]
+# test:   [ "$TELA_SYSTEM_DUMMY_b_SIZE" == 2 ]
+# test:   [ "$TELA_SYSTEM_DUMMY_c_SIZE" == 3 ]
+# test:   [ -z "$TELA_SYSTEM_DUMMY_0_SIZE" ]
+# result: ^ok[^#]*$
+# rc: triple.rc
+
+dummy a:
+dummy *:
+dummy b:
+dummy c:

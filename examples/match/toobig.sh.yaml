@@ -1,0 +1,5 @@
+# Request a dummy resource with a size requirement that cannot be fulfilled
+
+system:
+  dummy a:
+    size: >1000000

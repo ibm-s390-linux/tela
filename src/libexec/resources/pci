@@ -1,0 +1,247 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# pci - collects state for pci resources.
+#
+# Copyright IBM Corp. 2023
+#
+# Usage: pci [<datafile>]
+#
+# If a YAML datafile was specified, determine characteristics of all mentioned
+# resources. Otherwise list all available resources.
+#
+# Environment variables:
+#   PCIFMT=fid|uid   Specify the PCI ID format to use (default is fid)
+#
+
+DATAFILE="$1"
+
+LIBEXEC="${TELA_FRAMEWORK:-$(readlink -f $(dirname $0)/../../..)}"/src/libexec
+
+source $LIBEXEC/lib/common.bash || exit 1
+
+PCIBUS="/sys/bus/pci/devices"
+PCIDEVS=()
+HANDLED=()
+
+shopt -s nullglob
+
+function canonical_id() {
+	local _var="$1" _id="$2"
+
+	printf -v "$_var" "0x%08x" "$_id" 2>/dev/null
+}
+
+function enumerate_pcidevs() {
+	local dir busid fid uid
+
+	for dir in $PCIBUS/* ; do
+		read fid 2>/dev/null <$dir/function_id || continue
+		uid=""
+		read -r uid 2>/dev/null <"$dir/uid"
+		busid=${dir##*/}
+
+		# Add to PCIDEVS array
+		PCIDEVS+=( "$busid $fid $uid" )
+	done
+}
+
+function get_pci_dir() {
+	local var=$1 id=$2 pcidev fid IFS
+
+	for pcidev in "${PCIDEVS[@]}" ; do
+		set -- $pcidev
+		busid=$1
+		fid=$2
+		if [[ "$id" == "$fid" ]] ; then
+			eval "$var=$PCIBUS/$busid"
+			return
+		fi
+	done
+
+	eval "$var="
+}
+
+function get_fid_by_uid() {
+	local _var="$1" _id="$2" _busid _fid _uid _pcidev
+
+	for _pcidev in "${PCIDEVS[@]}" ; do
+		IFS=' ' read -r _busid _fid _uid <<<"$_pcidev"
+		if [[ "$_id" == "$_uid" ]] ; then
+			eval "$_var=$_fid"
+			return
+		fi
+	done
+
+	eval "$_var="
+}
+
+function supports_pnetids() {
+	local vendor=$1 device=$2
+
+	[[ $vendor == "0x1014" && $device == "0x04ed" ]] && return 0
+	[[ $vendor == "0x15b3" && $device == "0x1003" ]] && return 0
+	[[ $vendor == "0x15b3" && $device == "0x1004" ]] && return 0
+	[[ $vendor == "0x15b3" && $device == "0x1016" ]] && return 0
+
+	return 1
+}
+
+function get_pnetid_by_port() {
+	local util="$1" port="$2" var="$3" id
+
+	id=$(dd if="$util" bs=16 count=1 skip=$port conv=ascii \
+		2>/dev/null | tr -d '\0')
+	if [[ -n "$id" && "$id" != "                " ]] ; then
+		eval "$var=\"$id\""
+		return
+	fi
+	eval "$var="
+}
+
+# Return true/0 if PCI device with specified FID has already been handled
+function check_id_handled() {
+	local fid="$1" id
+
+	for id in "${HANDLED[@]}" ; do
+		if [[ "$fid" == "$id" ]] ; then
+		       return 0
+		fi
+	done
+
+	HANDLED+=( "$fid" )
+
+	return 1
+}
+
+function print_pci_id() {
+	local fid="$1" sysfs uid unique="-" pcifmt="${PCIFMT:-fid}"
+
+	get_pci_dir sysfs "$fid"
+
+	read -r uid 2>/dev/null <"$sysfs/uid"
+	read -r uid_unique 2>/dev/null <"$sysfs/uid_is_unique"
+
+	if [[ "$pcifmt" == "uid" ]] &&
+	   ( [[ "$uid_unique" != 1 ]] || [[ -z "$uid" ]] || [[ "$uid" == "0x0" ]] ) ; then
+		echo "Warning: PCIFMT=uid, but PCI UIDs are unavailable" >&2
+		pcifmt="fid"
+	fi
+
+	if [[ "$pcifmt" == "uid" ]] ; then
+		echo "pci uid:$uid:"
+	else
+		echo "pci $fid:"
+	fi
+}
+
+function check_pci() {
+	local id="$1" sysfs busid pchid port vendor device class vfn uid pft if_name pport pnetid
+	local uid_unique="-"
+
+	canonical_id id "$id" || return 1
+	get_pci_dir sysfs $id
+
+	[[ -e "$sysfs" ]] || return 1
+
+	check_id_handled "$id" && return 1
+
+	busid=${sysfs##*/}
+	read class <$sysfs/class
+	read device <$sysfs/device
+	read pchid <$sysfs/pchid
+	read port <$sysfs/port
+	read pft <$sysfs/pft
+	read uid <$sysfs/uid
+	read uid_unique 2>/dev/null <$sysfs/uid_is_unique
+	read vendor <$sysfs/vendor
+	read vfn <$sysfs/vfn
+
+	# Create output
+	print_pci_id "$fid"
+	echo "  _tela_alias:"
+	echo "    - fid:$id"
+	echo "    - uid:$uid"
+	echo "  busid: $busid"
+	echo "  class: $class"
+	echo "  device: $device"
+	echo "  fid: $id"
+	echo "  pchid: $pchid"
+	echo "  port: $port"
+	echo "  pft: $pft"
+	echo "  sysfs: $sysfs"
+	echo "  uid: $uid"
+	echo "  uid_is_unique: $uid_unique"
+	echo "  vendor: $vendor"
+	echo "  vfn: $vfn"
+	if [[ -d "$sysfs/net" ]] ; then
+		for dir in $sysfs/net/*; do
+			[[ ! -d "$dir" ]] && continue
+			if_name="${dir##*/}"
+			read pport <$sysfs/net/$if_name/dev_port
+			get_pnetid_by_port "$sysfs/util_string" $pport pnetid
+			echo "  netdev $if_name:"
+			echo "    if_name: $if_name"
+			echo "    pport: $pport"
+			if [[ -n "$pnetid" ]] ; then
+				echo "    pnetid: \"$pnetid\""
+			fi
+		done
+	fi
+
+	# Handle PNETID information
+	if supports_pnetids $vendor $device ; then
+		check_pnetids "$sysfs/util_string" "  " "pnetid_count"
+	fi
+
+	return 0
+}
+
+function get_state() {
+	local IFS=$'\n' id ids fid count=0
+
+	while read -r line ; do
+		IFS=': ' read -r -a ids <<<"$line"
+		[[ "${ids[0]}" != "pci" ]] && continue
+
+		fid=""
+		if [[ "${#ids[@]}" -eq 2 ]] ; then
+			fid="${ids[1]}"
+		elif [[ "${ids[1]}" == "fid" ]] ; then
+			fid="${ids[2]}"
+		elif [[ "${ids[1]}" == "uid" ]] ; then
+			get_fid_by_uid fid "${ids[2]}"
+		fi
+
+		[[ -z "$fid" ]] && continue
+
+		check_pci "$fid" && (( count=count+1 ))
+	done
+	echo "pci_count_available: $count"
+}
+
+function get_all() {
+	local do_list=$1 pcidev fid count=0
+
+	for pcidev in "${PCIDEVS[@]}" ; do
+		set -- $pcidev
+		fid=$2
+		(( count=count+1 ))
+		[[ $do_list == 1 ]] && print_pci_id "$fid"
+	done
+
+	[[ $do_list == 0 ]] && echo "pci_count_total: $count"
+}
+
+enumerate_pcidevs
+
+if [[ -n "$DATAFILE" ]] ; then
+	# Get state for resources specified in datafile
+	get_state <"$DATAFILE"
+	get_all 0
+else
+	# Get list of all available resources
+	get_all 1
+fi
+
+exit 0

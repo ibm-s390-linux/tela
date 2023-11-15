@@ -1,0 +1,4 @@
+# result:  ^ok.*# SKIP Missing
+
+dummy a:
+  size: >= 3

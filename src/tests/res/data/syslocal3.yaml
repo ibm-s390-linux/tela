@@ -1,0 +1,10 @@
+# Check if localhost and remote requirements are only matched against resources
+# of the same type. This variation tests without a matching attribute
+# requirement.
+#
+# result:  ^ok.*# SKIP Missing
+# rc:     syslocal.rc
+
+system localhost:
+system remote:
+  attr: 0

@@ -1,0 +1,5 @@
+# Expect: Unhandled sequence
+
+test:
+  - 1
+  - 2

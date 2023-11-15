@@ -1,0 +1,7 @@
+# test:   [ "$TELA_SYSTEM_TOOLS_true" == "/bin/sh" ]
+# result: ^ok[^#]*$
+# rc: tools_redir.rc
+
+system:
+  tools:
+    true:

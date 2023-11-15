@@ -1,0 +1,6 @@
+test:
+  plan:
+    simple_nosub.sh: "desc for simple_nosub.sh"
+
+system:
+  dummy x:

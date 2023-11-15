@@ -1,0 +1,252 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# kernel - collect Linux kernel-related system attributes.
+#
+# Copyright IBM Corp. 2023
+#
+# Usage: kernel [<datafile>]
+
+DATAFILE="$1"
+KCONFIG=""
+KCONFIG_GREP=""
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
+emit()
+{
+	local level=$1 i
+
+	shift
+	printf "%*s%s\n" $((level * 2)) "" "$@"
+}
+
+#
+# === GENERIC KERNEL INFORMATION ======================================
+#
+obtain_kernel_version()
+{
+	emit 1 "version: $(uname -r)"
+}
+
+#
+# === KERNEL MODULE INFORMATION =======================================
+#
+kmod_filepath_info()
+{
+	local kmod="${1%.ko*}"
+
+	modinfo "$kmod" 2>&1 \
+		|grep filename:	      \
+		|cut -d: -f2-	      \
+		|xargs echo
+}
+
+kmod_check_module()
+{
+	local kmod="$1"
+	local kmodpath f
+
+	#
+	# First check if it is built-in to the kernel.
+	#
+	# Look up the kernel module in the modules.builtin file.
+	# Entries look like:
+	#   kernel/crypto/crc32c.ko
+	#
+	f=/lib/modules/$(uname -r)/modules.builtin
+	if test -r $f && grep -qE "/${kmod%.ko*}.ko$" $f; then
+		emit 3 "$kmod: \"built-in\""
+		return 0
+	fi
+
+	#
+	# Perform a modinfo testing and test the retrieved file names.
+	#
+	# Report the first found file name only (multiple file names
+	# might be available if one or more kernel modules would provide
+	# the same functionality, for example, in-kernel crypto algorithm
+	# with a software or hardware-accelerated module.
+	#
+	# TIP:
+	# modinfo can be invoked with -k to specify a particular (installed)
+	# kernel version other than the running kernel.
+	#
+	kmodpath=$(kmod_filepath_info "$kmod" |head -1)
+	if test "$kmodpath"; then
+		emit 3 "$kmod: \"$kmodpath\""
+	fi
+}
+
+kmod_obtain_state()
+{
+	local line kmod
+	local IFS=$'\n'
+
+	# Header
+	read line
+	[[ -n "$line" ]] && emit 1 $line
+
+	# Kernel modules
+	while read -r line; do
+		kmod=${line:2}
+		kmod_check_module "${kmod%%:*}"
+	done
+}
+
+#
+# === KERNEL CONFIGURATION ============================================
+#
+
+kconfig_configure_grep()
+{
+	case "$KCONFIG" in
+	*.gz)	KCONFIG_GREP=zgrep  ;;
+	*.xz)	KCONFIG_GREP=xzgrep ;;
+	*.bz2)	KCONFIG_GREP=bzgrep ;;
+	*)	KCONFIG_GREP=grep   ;;
+	esac
+}
+
+#
+# Find kernel config of the currently running kernel.
+# Examples to look for are:
+#   - /boot/config-4.13.9-300.fc27.s390x
+#   - /proc/config.gz
+kconfig_setup()
+{
+	local f
+
+	for f in $KCONFIG_FILE /boot/config-$(uname -r) /proc/config.gz; do
+		if test -r "$f"; then
+			KCONFIG="$f"
+			break;
+		fi
+	done
+	kconfig_configure_grep
+}
+
+kconfig_check()
+{
+	local opt="$1"
+	local val
+
+	val=$($KCONFIG_GREP -E "CONFIG_${opt}([[:blank:]]|=)" $KCONFIG)
+	case "$val" in
+	*=[ym])
+		emit 3 "$opt: \"${val#*=}\""
+		;;
+	*" is not set"|*=n)
+		emit 3 "$opt: \"n\""
+		;;
+	*=[0-9]*|\"*\")
+		emit 3 "$opt: \"${val#*=}\""
+		;;
+	'')
+		# Do not report kernel config options that likely do not exist
+		:
+		;;
+	*)
+		echo "Missing case for kernel config value: $val" >&2
+		;;
+	esac
+}
+
+kconfig_obtain_state()
+{
+	local line kconfig
+	local IFS=$'\n'
+
+	# Header
+	read line
+	[[ -n "$line" ]] && emit 1 $line
+
+	# Kernel config options (without CONFIG_ prefix)
+	while read -r line; do
+		kconfig=${line:2}
+		kconfig_check "${kconfig%%:*}"
+	done
+}
+
+#
+# === COMMON KERNEL HANDLING ==========================================
+#
+
+# Invoke internal kernel functions
+handle_kernel_keys() {
+	local name=$1 datafile=$2 line
+
+	case $name in
+	"modules")
+		kmod_obtain_state < "$datafile"
+		;;
+	"config")
+		kconfig_obtain_state < "$datafile"
+		;;
+	*)
+		# Ignore unknown kernel attribute
+		return
+	esac
+}
+
+obtain_kernel_attributes()
+{
+	local IFS tmpdir line indent section resources entry
+
+	tmpdir=$(mktemp -d)
+	if test -z "$tmpdir"; then
+		echo "Could not create temporary directory" >&2
+		exit 1
+	fi
+
+	# Split data into sections
+	IFS=$'\n'
+	while read -r line ; do
+		indent="${line%%[![:space:]]*}"
+		line=${line#"$indent"}
+
+		# Get section name
+		if test "$indent" = "  "; then
+			section="${line% *}"
+			section="${section%:}"
+
+			# Filter out suspect section names with path components
+			[[ "$section" =~ / ]] && unset section
+		fi
+
+		# Skip lines outside of a valid section
+		test -z "$section" && continue
+
+		echo "${indent:2}""$line" >>"$tmpdir/$section"
+	done
+
+	# Process each section
+	for entry in "$tmpdir/"* ; do
+		section=${entry##*/}
+		handle_kernel_keys "$section" "$entry"
+		rm -f "$entry"
+	done
+
+	rmdir "$tmpdir"
+}
+
+get_state()
+{
+	local line IFS
+
+	# Initialize
+	kconfig_setup
+	IFS=$'\n'
+
+	# Report section header
+	read line
+	line=${line:-kernel:}
+	echo $line
+
+	obtain_kernel_version
+	obtain_kernel_attributes
+}
+
+test "$DATAFILE" && get_state <"$DATAFILE"
+
+exit 0

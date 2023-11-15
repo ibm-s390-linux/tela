@@ -1,0 +1,7 @@
+# Objects interleaved with other objects
+
+system:
+  dummy 1:
+  other 1:
+  dummy 2:
+  other 2:

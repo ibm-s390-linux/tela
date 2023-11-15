@@ -1,0 +1,6 @@
+# Check if warning is emitted when copy source does not exist.
+#
+# result:  ^# WARNING: .* Unresolved copy source
+# rc: copy2.rc
+
+dummy a:

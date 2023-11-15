@@ -1,0 +1,4 @@
+# Expect: Plan is defined but empty
+
+test:
+  plan:

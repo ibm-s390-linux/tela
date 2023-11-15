@@ -1,0 +1,124 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# apqn - collect state for apqn resources.
+#
+# Copyright IBM Corp. 2023
+#
+# Usage: apqn [<datafile>]
+#
+# If a YAML datafile was specified, determine characteristics of all mentioned
+# resources. Otherwise list all available resources.
+#
+
+DATAFILE="$1"
+
+APBUS="/sys/bus/ap/devices"
+
+shopt -s nullglob
+
+function canonical_id() {
+	local p2="00" p4="0000" var="$1" id="$2" spaces card queue
+
+	# Remove leading and trailing spaces
+	spaces="${id%%[![:space:]]*}"
+	id=${id#"$spaces"}
+	spaces="${id##*[![:space:]]}"
+	id=${id%"$spaces"}
+
+	# Split ID portions
+	card=${id%%.*}
+	queue=${id##*.}
+
+	# Replace missing leading digits with defaults
+	[ ${#card} -lt ${#p2} ] && card="${p2:0:$((${#p2}-${#card}))}$card"
+	[ ${#queue} -lt ${#p4} ] && queue="${p4:0:$((${#p4}-${#queue}))}$queue"
+
+	eval "$var=$card.$queue"
+}
+
+function get_mode() {
+	local var="$1" fn="$2" c a e
+
+	(( c=fn & 0x10000000 ))
+	(( a=fn & 0x08000000 ))
+	(( e=fn & 0x04000000 ))
+
+	if [[ "$c" -gt 0 ]] ; then
+		eval "$var=cca"
+		return
+	fi
+	if [[ "$a" -gt 0 ]] ; then
+		eval "$var=accel"
+		return
+	fi
+	if [[ "$e" -gt 0 ]] ; then
+		eval "$var=ep11"
+		return
+	fi
+}
+
+function check_apqn() {
+	local id="$1" sysfs type online raw fn level mode card domain
+
+	canonical_id id $id
+	sysfs="$APBUS/$id"
+
+	[[ -e "$sysfs" ]] || return
+
+	card=${id%%.*}
+	domain=${id##*.}
+	read type < "$sysfs/../type"
+	level=${type#CEX}
+	level=${level%[A-Z]}
+
+	read online <"$sysfs/../online"
+	read raw <"$sysfs/../raw_hwtype"
+	read fn <"$sysfs/../ap_functions"
+	get_mode mode "$fn"
+
+	# Create output
+	echo "apqn $id:"
+	echo "  sysfs: $sysfs"
+	echo "  busid: $id"
+	echo "  card: $card"
+	echo "  domain: $domain"
+	[ -n "$online" ] && echo "  online: $online"
+	[ -n "$type" ]   && echo "  type: $type"
+	[ -n "$level" ]  && echo "  cex_level: $level"
+	[ -n "$mode" ]   && echo "  mode: $mode"
+	[ -n "$raw" ]    && echo "  raw_hwtype: $raw"
+	[ -n "$fn" ]     && echo "  ap_functions: $fn"
+}
+
+function get_state() {
+	local IFS=$'\n'
+
+	while read -r line ; do
+		[ ${line:0:5} != "apqn " ] && continue
+		id=${line:5}
+		id="${id%:}"
+
+		check_apqn "$id"
+	done
+}
+
+function list_all() {
+	local sysfs base
+
+	for sysfs in $APBUS/* ; do
+		base=${sysfs##*/}
+		# Note: [.] needed due to inconsistent behavior of older Bash
+		[[ $base =~ [.] ]] && echo "apqn $base:"
+	done
+}
+
+if [ -n "$DATAFILE" ] ; then
+	# Get state for resources specified in datafile
+	get_state <"$DATAFILE"
+else
+	# Get list of all available resources
+	list_all
+fi
+
+exit 0

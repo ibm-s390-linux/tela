@@ -1,0 +1,4 @@
+system:
+  kernel:
+    config:
+      config_block:

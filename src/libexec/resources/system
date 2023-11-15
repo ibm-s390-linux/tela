@@ -1,0 +1,498 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# system - collect state for top-level system- and associated child-resources.
+#
+# Copyright IBM Corp. 2023
+#
+# Usage: system [<datafile>]
+#
+# If a YAML datafile was specified, determine characteristics of all mentioned
+# resources. Otherwise list all available resources.
+#
+
+TOOLDIR=$(readlink -f $(dirname $0))
+PROC_SYSINFO="/proc/sysinfo"
+PROC_CPUINFO="/proc/cpuinfo"
+PROC_MEMINFO="/proc/meminfo"
+PROC_SERVICE_LEVELS="/proc/service_levels"
+SYS_MEM="/sys/devices/system/memory"
+SYS_MM="/sys/kernel/mm"
+DATAFILE="$1"
+
+# Echo name of system
+function get_system()
+{
+	local IFS line
+
+	IFS=$'\n'
+	read line
+	echo $line
+}
+
+# Get main IP address
+function get_ip()
+{
+	local line dev
+
+	# Get default network device
+	while read -r line ; do
+		set -- $line
+		[[ $1 != "default" ]] && continue
+		while [[ $# -gt 1 ]] ; do
+			shift
+			[[ $1 == "dev" ]] && dev=$2
+		done
+	done < <(ip route show)
+	[[ -z "$dev" ]] && return
+
+	# Get IP address of default network device
+	while read -r line ; do
+		set -- $line
+		[[ "$1" != "inet" ]] && continue
+		echo "  ip: ${2%%/*}"
+		return
+	done < <(ip addr show dev $dev)
+}
+
+# Echo miscellaneous system information
+function get_misc()
+{
+	echo "  arch: \"${MACHTYPE%%-*}\""
+	if [[ -n "$SSH_CONNECTION" ]] ; then
+		set -- $SSH_CONNECTION
+		echo "  ip: $3"
+	else
+		get_ip
+	fi
+}
+
+# Get hypervisor information
+function get_hypervisor()
+{
+	local IFS hypervisor version key val
+
+	if [ ! -e $PROC_SYSINFO ] ; then
+		echo "  hypervisor:"
+		return
+	fi
+
+	IFS=":" ; while read -r key val; do
+		case $key in
+			"LPAR Name") hypervisor=lpar ;;
+			VM[0-9][0-9]\ Control\ Program)	hypervisor=$val ;;
+		esac
+	done < $PROC_SYSINFO
+
+	IFS=" "
+	set $hypervisor
+	case $1 in
+	"z/VM")	echo "  hypervisor:"
+		echo "    type: zvm"
+		echo "    version: $2"
+		;;
+	"KVM/Linux")
+		echo "  hypervisor:"
+		echo "    type: kvm"
+		;;
+	*)
+		echo "  hypervisor:"
+		echo "    type: $hypervisor"
+		;;
+	esac
+
+}
+
+# Obtain information from /proc/cpuinfo
+function get_cpu_info()
+{
+	local field="$1"
+	local list ent
+
+	echo "  cpu-$field:"
+
+	test -r $PROC_CPUINFO || return
+
+	list=$(grep -E "^$field[[:blank:]]+:" $PROC_CPUINFO)
+	for ent in ${list##*:}; do
+		echo "    $ent:"
+	done
+}
+
+# Obtain CPU features (hardware capabilities)
+function get_cpu_features()
+{
+	get_cpu_info "features"
+}
+
+# Obtain facilities
+function get_cpu_facilities()
+{
+	get_cpu_info "facilities"
+}
+
+function _emit()
+{
+	local level=$1 i
+
+	shift
+	(( level*=2 ))
+	printf "%*s%s\n" $level "" "$@"
+}
+
+# Obtain information about the CPU-Measurement Facilities
+function get_cpu_mf()
+{
+	local _i1 _i2 fname sect attr1 attr2 rest val i
+
+	test -r $PROC_CPUINFO || return
+	test -r $PROC_SERVICE_LEVELS || return
+
+	_emit 1 "cpu-mf:"
+	while read -r _i1 fname _i2 attr1 attr2 rest; do
+		case $fname in
+		Counter)
+			test x$sect = x$fname && continue
+			_emit 2 "counter:"
+			# Obtain counter version numbers
+			val=${attr1##*=}
+			_emit 3 "cfvn: ${val%%.*}"
+			_emit 3 "csvn: ${val##*.}"
+			# Obtain counter set authorizations
+			val=${attr2##*=}
+			_emit 3 "auth:"
+			test $((0x01 & 0x$val)) -ne 0 && _emit 4 "extended:"
+			test $((0x02 & 0x$val)) -ne 0 && _emit 4 "basic:"
+			test $((0x04 & 0x$val)) -ne 0 && _emit 4 "problem-state:"
+			test $((0x08 & 0x$val)) -ne 0 && _emit 4 "crypto-activity:"
+			test $((0x20 & 0x$val)) -ne 0 && _emit 4 "mt-diagnostic:"
+		;;
+		Sampling)
+			if test x$sect != x$fname; then
+				_emit 2 "sampling:"
+				# Obtain min and max rates
+				for i in "$attr1" "$attr2"; do
+					_emit 3 "${i%%=*}: ${i##*=}"
+				done
+				_emit 3 "modes:"
+			else
+				_emit 4 "${attr1##*=}:"
+			fi
+		;;
+		esac
+		# Save last facility name to process multiple lines
+		sect=$fname
+	done < <(grep "^CPU-MF:" $PROC_SERVICE_LEVELS)
+
+	if grep -E "^facilities[[:blank:]]+:" $PROC_CPUINFO |grep -wq 64; then
+		_emit 2 "ri:"
+	fi
+}
+
+# Obtain number of (online) CPUs
+function get_cpu()
+{
+	_emit 1 "cpus:"
+
+	if test -r $PROC_CPUINFO; then
+		_emit 2 "online: $(grep -c ^processor $PROC_CPUINFO)"
+	fi
+}
+
+# Convert to bytes
+function to_bytes()
+{
+	local var=$1 unit=$2 _val _factor=1
+
+	eval "_val=\$$var"
+	case "$unit" in
+	KB|kB)  _factor=$((1024)) ;;
+	MB)	_factor=$((1024 * 1024)) ;;
+	GB)	_factor=$((1024 * 1024 * 1024)) ;;
+	esac
+	_val=$((_val * _factor))
+	eval "$var=$_val"
+}
+
+# Convert to lower case
+if test ${BASH_VERSINFO[0]} -ge 4; then
+	function to_lower()
+	{
+		local var=$1 _val
+
+		eval "_val=\"\$$var\""
+		_val=${_val,,}
+		eval "$var=\"$_val\""
+}
+else
+	function to_lower()
+	{
+		local var=$1 _val
+
+		eval "_val=\"\$$var\""
+			_val=$(echo $_val |tr [:upper:] [:lower:])
+		eval "$var=\"$_val\""
+	}
+fi
+
+
+# Obtain information about hugepages
+function get_mem_hugepages()
+{
+	local hp nr_free nr_total
+
+	test -d $SYS_MM/hugepages || return
+
+	_emit 2 "hugepages:"
+	for hp in $SYS_MM/hugepages/*; do
+		read nr_total < $hp/nr_hugepages
+		read nr_free  < $hp/free_hugepages
+		hp=${hp##*/hugepages-}
+		hp=${hp%kB}
+		to_bytes hp "kB"
+		_emit 3 "$hp:"
+		_emit 4 "total: $nr_total"
+		_emit 4 "free: $nr_free"
+	done
+}
+
+# Obtain memory information
+function get_mem()
+{
+	local key val unit block_size block state memtotal=0
+
+	_emit 1 "mem:"
+
+	while read -r key val unit; do
+		key=${key%:}
+		case "$key" in
+		SwapTotal)
+			to_bytes val $unit
+			to_lower key
+			_emit 2 "$key: $val"
+		;;
+		Hugepagesize|HugePages_Total|HugePages_Free)
+			to_bytes val $unit
+			to_lower key
+			_emit 2 "default_$key: $val"
+		;;
+		esac
+	done 2>/dev/null < $PROC_MEMINFO
+
+	# transparent huges page enablement
+	# Status is in brackets, for example, "[always] madvise never".
+	if read val 2>/dev/null <$SYS_MM/transparent_hugepage/enabled ; then
+		val=${val#*[}
+		val=${val%]*}
+		_emit 2 "transparent_hugepage: \"$val\""
+	fi
+
+	# Obtain total (physical) memory size from sysfs
+        if read block_size 2>/dev/null <$SYS_MEM/block_size_bytes ; then
+		(( block_size=0x${block_size#0x} ))
+
+		for block in $SYS_MEM/memory* ; do
+			read state <$block/state
+			[[ "$state" == "online" ]] && (( memtotal+=block_size ))
+		done
+
+		_emit 2 "memtotal: $memtotal"
+	fi
+
+	# Gather huge page information
+	get_mem_hugepages
+}
+
+# Get name of local user
+function get_user() {
+	local username
+
+	username=$(whoami)
+	[ -n "$username" ] && echo "  user: \"$username\""
+}
+
+# Get OS information
+function get_os() {
+	local line IFS
+
+	IFS=$'\n'
+	while read -r line ; do
+		echo "$line"
+		case "$line" in
+		"    id:"*)	 export TELA_OS_ID="${line#*: }" ;;
+		"    version:"*) export TELA_OS_VERSION="${line#*: }" ;;
+		esac
+	done < <($TOOLDIR/../os)
+}
+
+# Remove leading space
+function strip_space() {
+	local var="$1" val indent
+
+	eval "val=\$$var"
+	indent="${val%%[![:space:]]*}"
+	val=${val#"$indent"}
+	eval "$var=$val"
+}
+
+# Get information about installed tools
+function get_tools() {
+	local IFS line tool first path
+
+	IFS=$'\n'
+	while read -r line ; do
+		if [ "$line" == "tools:" ] ; then
+			# Print section name once
+			if [ -z "$first" ] ; then
+				echo "  $line"
+				first=0
+			fi
+			continue
+		fi
+		path="${line#*:}"
+		tool="${line%%:*}"
+		strip_space path
+		strip_space tool
+
+		if [ -z "$path" ] ; then
+			path=$(type -P $tool 2>/dev/null)
+		else
+			test -x $path
+		fi
+
+		[ $? -eq 0 ] && echo "    $tool: $path"
+	done
+}
+
+# Call resource specific scripts
+function handle_section() {
+	local IFS name=$1 datafile=$2 line
+
+	# Apply internal handling for some resources
+	case $name in
+	"tools")
+		get_tools < "$datafile"
+		;;
+	"ssh")
+		sed -e 's/^/  /g' <"$datafile"
+		;;
+	*)
+		[ ! -x "$TOOLDIR/$name" ] && return
+
+		# Indent output
+		IFS=$'\n'
+		while read -r line ; do
+			echo "  $line"
+		done < <("$TOOLDIR/$name" "$datafile")
+		;;
+	esac
+
+}
+
+# Get list of resource types backed by scripts in $TOOLDIR
+function get_resource_types() {
+	local _var=$1 _filename _name _list
+
+	for _filename in "$TOOLDIR/"* ; do
+		_name=${_filename##*/}
+		if [[ -x "$_filename" && $_name != "system" ]] ; then
+			_list="$_list $_name"
+		fi
+	done
+
+	eval "$_var=\"$_list\""
+}
+
+# Data about resources specified on standard input
+function get_resources() {
+	local IFS tmpdir line indent section resources entry
+
+	tmpdir=$(mktemp -d)
+	if [[ -z "$tmpdir" ]] ; then
+		die "Could not create temporary directory"
+	fi
+
+	# Create empty data files for each resource type to ensure correct
+	# total counts even if no object is specified
+	get_resource_types types
+	for entry in $types ; do
+		touch "$tmpdir/$entry"
+	done
+
+	# Split data into sections
+	IFS=$'\n'
+	while read -r line ; do
+		indent="${line%%[![:space:]]*}"
+		line=${line#"$indent"}
+
+		# Get section name
+		if [[ "$indent" == "  " ]] ; then
+			section="${line%:}"
+			section="${section% *}"
+
+			# Filter out suspect section names with path components
+			[[ "$section" =~ / ]] && unset section
+		fi
+
+		# Skip lines outside of a valid section
+		[[ -z "$section" ]] && continue
+
+		echo "${indent:2}""$line" >>"$tmpdir/$section"
+	done
+
+	# Process each section
+	for entry in "$tmpdir/"* ; do
+		section=${entry##*/}
+		handle_section "$section" "$entry"
+		rm -f "$entry"
+	done
+
+	rmdir "$tmpdir"
+}
+
+function get_state() {
+	get_system
+	get_misc
+	get_hypervisor
+	get_cpu
+	get_cpu_features
+	get_cpu_facilities
+	get_cpu_mf
+	get_mem
+	get_user
+	get_os
+	get_resources
+}
+
+function list_one()
+{
+	local tool="$1" line IFS
+
+	IFS=$'\n'
+	while read -r line ; do
+		echo "  $line"
+	done < <("$TOOLDIR/$tool")
+}
+
+function list_all()
+{
+	local types name
+
+	echo "system localhost:"
+
+	get_resource_types types
+
+	for name in $types ; do
+		list_one $name
+	done
+}
+
+if [ -n "$DATAFILE" ] ; then
+	# Get state for resources specified in datafile
+	get_state < <("$TOOLDIR/../preprocess" "$DATAFILE")
+else
+	# Get list of all available resources
+	list_all
+fi
+
+exit 0

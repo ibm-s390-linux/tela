@@ -1,0 +1,4 @@
+system:
+  kernel:
+    modules:
+      no_such_kernel_module:

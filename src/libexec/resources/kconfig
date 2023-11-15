@@ -1,0 +1,113 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# kconfig - collect state of kernel configuration options.
+#
+# Copyright IBM Corp. 2023
+#
+# Usage: kconfig [<datafile>]
+#
+# Obtain the value of kernel configuration options specified in the datafile.
+# The result depends on the setting of the kernel configuration options as
+# follows:
+#
+# Kernel configuration option	=> Resulting mapping
+#
+# CONFIG_<x> is not set		=>			(no <x> reported)
+# CONFIG_<x>=y			=> <x>: y
+# CONFIG_<x>=m			=> <x>: m
+# CONFIG_<x>=<value>		=> <x>: "<value>"
+#
+#
+# Example input (datafile):
+#
+# kconfig:
+#   BLOCK:
+#   NR_CPUS:
+#   ISO9660_FS:
+#
+# Example output (stdout):
+#
+# kconfig:
+#   BLOCK: "y"
+#   NR_CPUS: "256"
+#   ISO9660_FS: "m"
+
+DATAFILE="$1"
+KCONFIG=""
+KCONFIG_GREP=""
+
+configure_kconfig_grep()
+{
+	case "$KCONFIG" in
+	*.gz)	KCONFIG_GREP=zgrep  ;;
+	*.xz)	KCONFIG_GREP=xzgrep ;;
+	*.bz2)	KCONFIG_GREP=bzgrep ;;
+	*)	KCONFIG_GREP=grep   ;;
+	esac
+}
+
+#
+# Find kernel config of the currently running kernel.
+# Examples to look for are:
+#   - /boot/config-4.13.9-300.fc27.s390x
+#   - /proc/config.gz
+find_kconfig()
+{
+	local f
+
+	for f in $KCONFIG_FILE /boot/config-$(uname -r) /proc/config.gz; do
+		if test -r "$f"; then
+			KCONFIG="$f"
+			break;
+		fi
+	done
+	configure_kconfig_grep
+}
+
+check_kconfig()
+{
+	local opt="$1"
+	local val
+
+	val=$($KCONFIG_GREP -E "CONFIG_${opt}([[:blank:]]|=)" $KCONFIG)
+	case "$val" in
+	*=[ym])
+		echo "  $opt: \"${val#*=}\""
+		;;
+	*" is not set"|*=n|'')
+		# Do not report kernel config options that are not set
+		:
+		;;
+	*=[0-9]*|\"*\")
+		echo "  $opt: \"${val#*=}\""
+		;;
+	*)
+		warn "Missing case for kernel config value: $val"
+		;;
+	esac
+}
+
+get_state()
+{
+	local line kconfig
+	local IFS=$'\n'
+
+	# Header
+	read line
+	[[ -n "$line" ]] && echo $line
+
+	# Kernel config options (without CONFIG_ prefix)
+	while read -r line; do
+		kconfig=${line:2}
+		check_kconfig "${kconfig%%:*}"
+	done
+}
+
+find_kconfig
+
+if test "$DATAFILE"; then
+	get_state <"$DATAFILE"
+fi
+
+exit 0

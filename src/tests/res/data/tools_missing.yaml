@@ -1,0 +1,3 @@
+# test:   [ -z "$TELA_SYSTEM_TOOLS_tela_this_tool_does_not_exist" ]
+# rc: tools_missing.rc
+# result: ^ok[^#]*$

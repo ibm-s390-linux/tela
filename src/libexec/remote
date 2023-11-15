@@ -1,0 +1,276 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# remote - test case helper tool to run commands on a remote system
+#
+# Copyright IBM Corp. 2023
+#
+# Usage: remote [OPTIONS] <system> <command>|-
+#
+# Run COMMAND on remote system identified by SYSTEM. A temporary directory
+# is automatically created on the remote system and used as current working
+# directory for the command. If "-" is specified instead of COMMAND,
+# read commands from standard input. Return the exit code of the last command
+# run on the remote system.
+#
+# Additional options can be specified to transfer files to the remote system
+# before running the command, and to retrieve files from the remote system
+# after the command was run.
+#
+# Note: This tool relies on environment variables that are set by the tela
+#       framework.
+#
+# OPTIONS
+#   -l <file/directory>  Local file or directory to copy to remote
+#   -r <file/directory>  Remote file or directory to copy from remote
+#   -o <directory>       Local target directory for copied files (default: .)
+#   -c                   Open a console connection (precludes other options)
+#   -H                   Run COMMAND on hypervisor's host of a system identified
+#                        by SYSTEM. SYSTEM is either a name of a remote system
+#                        or 'localhost'.
+#   -A                   Activate SSH agent forwarding.
+#
+
+SSH=ssh
+TAR=tar
+GZIP=gzip
+SSH_OPTS=(
+	-q
+	-o "ServerAliveInterval 10"
+	-o "ConnectTimeout 10"
+	-o "BatchMode yes"
+)
+
+if [[ -z "$TELA_FRAMEWORK" ]] ; then
+	TOOLPATH=$(readlink -f ${0%/*})
+	TELA_FRAMEWORK="${TOOLPATH%tela/src/*}tela"
+fi
+LIBEXEC="$TELA_FRAMEWORK/src/libexec"
+TELA_TOOL="$TELA_FRAMEWORK/src/tela"
+
+source $LIBEXEC/lib/common.bash || exit 1
+
+function cleanup() {
+	debug "Enter cleanup"
+
+	if [[ -n "$RTMPDIR" ]] ; then
+		debug "Remove remote temporary directory '$RTMPDIR'"
+		$SSH -T "${SSH_OPTS[@]}" $USER@$HOST rm -rf "$RTMPDIR"
+	fi
+
+	if [[ "$CTLSOCKET_CLOSE" == 1 ]] ; then
+		debug "Close temporary SSH control socket '$CTLSOCKET'"
+		$SSH -T "${SSH_OPTS[@]}" -O exit $USER@$HOST
+	fi
+
+	if [[ -n "$LTMPDIR" ]] ; then
+		debug "Remove local temporary directory '$LTMPDIR'"
+		rm -rf "$LTMPDIR"
+	fi
+
+	debug "Exit cleanup"
+}
+
+trap cleanup exit
+
+function copy_to_remote() {
+	local tarfile p p_dir p_file
+
+	# Use tar because scp can't handle symbolic links
+	tarfile="$LTMPDIR/tarfile"
+
+	# Add each file to archive without full path
+	for p in "$@" ; do
+		debug "Copy file to remote: $p"
+		p_dir=${p%/*}
+		p_file=${p##*/}
+		[[ "$p_dir" == "$p_file" ]] && p_dir=.
+
+		$TAR c -C "$p_dir" "$p_file" --to-stdout --owner=0 --group=0
+	done | $GZIP >"$tarfile"
+
+	# Unpack archive on remote
+	$SSH "${SSH_OPTS[@]}" $USER@$HOST \
+		$TAR xz -i -C "$RTMPDIR" <"$tarfile" ||
+		die "Could not copy files to remote"
+
+	rm -f "$tarfile"
+}
+
+function copy_from_remote() {
+	local cmdlist p p_dir p_file
+
+	# Use tar because scp can't handle symbolic links
+	cmdlist="$LTMPDIR/cmdlist"
+
+	echo "cd \"$RTMPDIR\"" >$cmdlist
+	echo "(" >>$cmdlist
+
+	# Create list of tar commands to store files without full path
+	for p in "$@" ; do
+		debug "Copy file from remote: $p"
+		p_dir=${p%/*}
+		p_file=${p##*/}
+		[[ "$p_dir" == "$p_file" ]] && p_dir=.
+
+		echo "$TAR c -C \"$p_dir\" \"$p_file\" --to-stdout --owner=0 --group=0" >>$cmdlist
+	done
+	echo ") | $GZIP --to-stdout" >>$cmdlist
+
+	# Run tar commands on remote and unpack result on local
+	$SSH -T "${SSH_OPTS[@]}" $USER@$HOST bash <$cmdlist |
+		$TAR xz -i  ||
+		die "Could not copy files to remote"
+
+	rm -f "$cmdlist"
+}
+
+debug "Parse command line"
+declare -a OPT_LOCAL OPT_REMOTE
+declare OPT_OUTPUT OPT_CONSOLE OPT_HYPERVISOR
+
+# Handle named parameters
+while getopts ":l:r:o:cHA" opt ; do
+	case $opt in
+		l)  OPT_LOCAL+=("$OPTARG") ;;
+		r)  OPT_REMOTE+=("$OPTARG") ;;
+		o)
+			[[ ! -d "$OPTARG" ]] &&
+				die "Directory '$OPTARG' not found"
+			OPT_OUTPUT="$OPTARG" ;;
+		c)  OPT_CONSOLE=1 ;;
+		H)  OPT_HYPERVISOR=1 ;;
+		A)  SSH_OPTS+=("-A") ;;
+		\?) die "Invalid option: -$OPTARG" ;;
+		:)  die "Option -$OPTARG requires an argument" ;;
+	esac
+done
+shift $((OPTIND-1))
+
+# Set default values
+[[ -z "$OPT_OUTPUT" ]] && OPT_OUTPUT="."
+
+# Handle positional parameters
+SYSTEM=$1
+shift
+COMMAND="$*"
+[[ -z "$SYSTEM" ]] && die "Missing SYSTEM argument"
+[[ -z "$COMMAND" ]] && die "Missing COMMAND argument"
+
+if [[ "$VERBOSE" == 1 ]] ; then
+	debug "  OPT_LOCAL=${OPT_LOCAL[@]}"
+	debug "  OPT_REMOTE=${OPT_REMOTE[@]}"
+	debug "  OPT_OUTPUT=$OPT_OUTPUT"
+	debug "  OPT_CONSOLE=$OPT_CONSOLE"
+	debug "  OPT_HYPERVISOR=$OPT_HYPERVISOR"
+	debug "  SYSTEM=$SYSTEM"
+	debug "  COMMAND=$COMMAND"
+fi
+
+# Handle console command
+if [[ $OPT_CONSOLE == 1 ]] ; then
+	[[ ${#OPT_LOCAL[@]} -gt 0 ]] && die "Cannot specify -l together with -c"
+	[[ ${#OPT_REMOTE[@]} -gt 0 ]] && die "Cannot specify -r together with -c"
+
+	if [[ "$COMMAND" == "-" ]] ; then
+		$TELA_TOOL console $SYSTEM
+	else
+		echo "$COMMAND" | $TELA_TOOL console $SYSTEM
+	fi
+
+	exit $?
+fi
+
+debug "Create local temporary directory"
+LTMPDIR=$(mktemp -d) ||
+	die "Could not create temporary directory"
+
+debug "Check for TELA variables"
+if [[ "$OPT_HYPERVISOR" != "1" ]]; then
+	eval "USER=\$TELA_SYSTEM_${SYSTEM}_SSH_USER"
+	[[ -z "$USER" ]] && die "Missing TELA_SYSTEM_${SYSTEM}_SSH_USER variable"
+
+	eval "HOST=\$TELA_SYSTEM_${SYSTEM}_SSH_HOST"
+	[[ -z "$HOST" ]] && die "Missing TELA_SYSTEM_${SYSTEM}_SSH_HOST variable"
+else
+	if [[ "$SYSTEM" != "localhost" ]]; then
+		eval "USER=\$TELA_SYSTEM_${SYSTEM}_HYPERVISOR_SSH_USER"
+		[[ -z "$USER" ]] && die "Missing TELA_SYSTEM_${SYSTEM}_HYPERVISOR_SSH_USER variable"
+
+		eval "HOST=\$TELA_SYSTEM_${SYSTEM}_HYPERVISOR_SSH_HOST"
+		[[ -z "$HOST" ]] && die "Missing TELA_SYSTEM_${SYSTEM}_HYPERVISOR_SSH_HOST variable"
+	else
+		eval "USER=\$TELA_SYSTEM_HYPERVISOR_SSH_USER"
+		[[ -z "$USER" ]] && die "Missing TELA_SYSTEM_HYPERVISOR_SSH_USER variable"
+
+		eval "HOST=\$TELA_SYSTEM_HYPERVISOR_SSH_HOST"
+		[[ -z "$HOST" ]] && die "Missing TELA_SYSTEM_HYPERVISOR_SSH_HOST variable"
+	fi
+fi
+
+if [[ -n "$_TELA_TMPDIR" ]] ; then
+	CTLSOCKET="$_TELA_TMPDIR/ctl_path.$USER@$HOST"
+	if [[ ! -S $CTLSOCKET ]] ; then
+		debug "Create persistent SSH control socket to $USER@$HOST"
+		# Note: >/dev/null required here to prevent tela from blocking
+		# during read from pipe
+		$SSH "${SSH_OPTS[@]}" -M -S $CTLSOCKET -N -f $USER@$HOST \
+			>/dev/null 2>&1 || \
+			die "SSH connection to $USER@$HOST failed"
+	fi
+else
+	debug "Create temporary SSH control socket"
+	CTLSOCKET="$LTMPDIR/ctlsocket"
+	CTLSOCKET_CLOSE=1
+	$SSH "${SSH_OPTS[@]}" -M -S $CTLSOCKET -N -f $USER@$HOST \
+		>/dev/null 2>&1 ||
+		die "SSH connection to $USER@$HOST failed"
+fi
+SSH_OPTS+=(-o "ControlPath $CTLSOCKET")
+
+debug "Create remote temporary directory"
+RTMPDIR=$($SSH "${SSH_OPTS[@]}" -n $USER@$HOST mktemp -d) ||
+	die "Could not create temporary directory on remote host"
+
+if [[ ${#OPT_LOCAL[@]} -gt 0 ]] ; then
+	# Copy specified files to remote system
+	copy_to_remote "${OPT_LOCAL[@]}"
+fi
+
+CMDLIST="$LTMPDIR/cmdpre"
+
+debug "Copy environment variables"
+while read -r VAR ; do
+	KEY=${VAR%%=*}
+	KEY2=${KEY#TELA_SYSTEM_${SYSTEM}_}
+
+	# Skip unrelated variables
+	[[ "$KEY" == "$KEY2" ]] && continue
+
+	VAL=${VAR#*=}
+	echo "export TELA_SYSTEM_$KEY2=\"$VAL\"" >>$CMDLIST
+done < <(env)
+
+# Ensure correct working directory
+echo "cd $RTMPDIR" >>$CMDLIST
+
+debug "Perform commands"
+if [[ "$COMMAND" == "-" ]] ; then
+	# Copy all commands from stdin to fifo. Note: specifying a shell
+	# is required here to prevent SSH banner output.
+	cat $CMDLIST - | $SSH -T "${SSH_OPTS[@]}" $USER@$HOST bash
+else
+	echo "$COMMAND" >>$CMDLIST
+	$SSH -T "${SSH_OPTS[@]}" $USER@$HOST bash <$CMDLIST
+fi
+RC=$?
+
+if [[ "${#OPT_REMOTE[@]}" -gt 0 ]] ; then
+	# Copy specified files from remote system to OPT_OUTPUT
+	cd "$OPT_OUTPUT" || die "Could not change directory to $OPT_OUTPUT"
+	copy_from_remote "${OPT_REMOTE[@]}"
+fi
+
+debug "Exit main"
+
+exit $RC

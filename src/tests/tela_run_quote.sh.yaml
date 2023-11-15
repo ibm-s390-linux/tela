@@ -1,0 +1,9 @@
+test:
+  plan:
+    # Format is <testname>: "<description>"
+    match: "Check if 'tela match' produces correct output"
+    run: "Check if 'tela run' passes previous match data intact to test exec"
+
+system:
+  packages:
+    bash: >= 4.4

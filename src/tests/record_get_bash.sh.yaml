@@ -1,0 +1,11 @@
+test:
+  plan:
+    zero:
+    stop:
+    defaults:
+    all_1:
+    all_0:
+    stdout_1:
+    stdout_0:
+    stderr_1:
+    stderr_0:

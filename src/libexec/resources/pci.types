@@ -1,0 +1,13 @@
+system */pci *: object
+system */pci */class/: number
+system */pci */device/: number
+system */pci */fid/: number
+system */pci */pchid/: number
+system */pci */port/: number
+system */pci */pft/: number
+system */pci */uid/: number
+system */pci */vendor/: number
+system */pci */vfn/: number
+system */pci */netdev *: object
+system */pci */pnetid *: object
+system */pci */pnetid_count/: number

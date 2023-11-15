@@ -1,0 +1,7 @@
+# Check if package name capitalization is untouched in variable name.
+# test:   [ -n "$TELA_SYSTEM_PACKAGES_bash" ]
+# result: ^ok[^#]*$
+
+system:
+  packages:
+    bash:

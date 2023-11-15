@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: MIT
+# scsi-device - SCSI-related functions for use in test cases
+#
+# Copyright IBM Corp. 2023
+#
+# library with helper functions for tela resources with associated SCSI device
+#
+
+# Set additional pseudo TELA environment variables for the given
+# TELA environment variable prefix referring to a matched resource ID
+# which does have an associated SCSI device (..._SCSI_DEV_SYSFS env var).
+# Suffixes of additionally set pseudo TELA environment variables (if available):
+# _SG_DEV_CDEV _LIN_TAPE_DEV_CDEV _ST_DEV_CDEV _CH_DEV_CDEV
+# _LIN_TAPE_DEV_SERIAL _SCSI_DEV_STATE
+function enrich_env_for_sdev() {
+	local envprefix="$1"
+	local sdevdirvar="${envprefix}_SCSI_DEV_SYSFS"
+	local sdevdir="${!sdevdirvar}"
+	local dir dev serial
+
+	shopt -s nullglob
+
+	# direct assignment does NOT do pathname expansion...
+	set -- $sdevdir/scsi_generic/*/
+	dir=$1
+	# or with an expensive subshell: dir=$(echo $sdevdir/scsi_generic/*/)
+	if [[ -e "$dir" ]]; then
+		dev=${dir%/}
+		dev=${dev##*/}
+		eval "${envprefix}_SG_DEV_CDEV=${dev}"
+	fi
+
+	# whitelist to drop IBMSpecial or other devices nodes.
+	# bash glob sorts so IBMtape0 comes before IBMtape0n.
+	set -- $sdevdir/lin_tape/IBMtape*/ $sdevdir/lin_tape/IBMchanger*/
+	dir=$1
+	if [[ -e "$dir" ]]; then
+		dev=${dir%/}
+		dev=${dev##*/}
+		eval "${envprefix}_LIN_TAPE_DEV_CDEV=${dev}"
+		read serial < $dir/serial_num
+		eval "${envprefix}_LIN_TAPE_DEV_SERIAL=${serial}"
+	fi
+
+	# whitelist to drop non-rewinding or other devices nodes.
+	# bash glob sorts so st0 comes before st0a, st0l, or st0m.
+	set -- $sdevdir/scsi_tape/st*/
+	dir=$1
+	if [[ -e "$dir" ]]; then
+		dev=${dir%/}
+		dev=${dev##*/}
+		eval "${envprefix}_ST_DEV_CDEV=${dev}"
+	fi
+
+	# whitelist to drop other devices nodes.
+	# bash glob sorts so sch0 comes first.
+	set -- $sdevdir/scsi_changer/sch*/
+	dir=$1
+	if [[ -e "$dir" ]]; then
+		dev=${dir%/}
+		dev=${dev##*/}
+		eval "${envprefix}_CH_DEV_CDEV=${dev}"
+	fi
+
+	local state
+	read state < $sdevdir/state
+	eval "${envprefix}_SCSI_DEV_STATE=${state}"
+
+	shopt -u nullglob
+}

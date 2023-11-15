@@ -1,0 +1,6 @@
+system:
+  kernel:
+    modules:
+      scsi_mod:
+  tools:
+    bash:

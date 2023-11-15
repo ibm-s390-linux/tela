@@ -1,0 +1,115 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# chpid - collect state for chpid resources.
+#
+# Copyright IBM Corp. 2023
+#
+# Usage: chpid [<datafile>]
+#
+# If a YAML datafile was specified, determine characteristics of all mentioned
+# resources. Otherwise list all available resources.
+#
+
+DATAFILE="$1"
+LIBEXEC="${TELA_FRAMEWORK:-$(readlink -f $(dirname $0)/../../..)}"/src/libexec
+
+source $LIBEXEC/lib/common.bash || exit 1
+
+shopt -s nullglob
+
+function check_attr() {
+	local sysfs="$1" attr="$2" indent="$3" prefix="$4" value
+
+	read value 2>/dev/null <"$sysfs" || return
+	value="$prefix$value"
+	[[ "$value" =~ ' ' ]] && value="\"$value\""
+	[[ -z "$indent" ]] && indent=0
+	printf "%*s%s: %s\n" $indent "" $attr $value
+}
+
+function supports_pnetids() {
+	local type=$1
+
+	[[ $type == "11" ]] && return 0
+	[[ $type == "24" ]] && return 0
+
+	return 1
+}
+
+function check_chpid() {
+	local id=$1 sysfs online type
+
+	canonical_chpid id $id || return 1
+	sysfs="/sys/devices/css${id%%.*}/chp${id}"
+
+	[[ -e $sysfs ]] || return 1
+
+	echo "chpid $id:"
+
+	echo "  busid: $id"
+	echo "  sysfs: $sysfs"
+
+	read online <"$sysfs/status"
+	if [[ "$online" == "online" ]] ; then
+		online=1
+	else
+		online=0
+	fi
+
+	echo "  online: $online"
+
+	check_attr "$sysfs/configure" "configured" 2
+	check_attr "$sysfs/type" "type" 2 "0x"
+	check_attr "$sysfs/chid" "chid" 2 "0x"
+	check_attr "$sysfs/chid_external" "chid_external" 2
+
+	# Handle PNETID information
+	read type <"$sysfs/type"
+	if supports_pnetids $type ; then
+		check_pnetids "$sysfs/util_string" "  " "pnetid_count"
+	fi
+
+	# Default values for meta-attributes
+	echo "  allow_offline: 0"
+
+	return 0
+}
+
+function get_state() {
+	local IFS=$'\n' count=0
+
+	while read -r line ; do
+		[[ ${line:0:6} != "chpid " ]] && continue
+		id=${line:6}
+		id="${id%:}"
+
+		check_chpid "$id" && (( count=count+1 ))
+	done
+	echo "chpid_count_available: $count"
+}
+
+function get_all() {
+	local do_list=$1 sysfs alias id count=0
+
+	for sysfs in /sys/devices/css*/chp* ; do
+
+		id=${sysfs##*chp}
+		(( count=count+1 ))
+		[[ $do_list == 1 ]] && echo "chpid $id:"
+	done
+
+	[[ $do_list == 0 ]] && echo "chpid_count_total: $count"
+}
+
+if [[ -n "$DATAFILE" ]] ; then
+	# Get state for resources specified in datafile
+	get_state <"$DATAFILE"
+	get_all 0
+else
+	# CHPID resources are automatically added when CCW devices are added
+	# as resource, therefore don't list them here
+	:
+fi
+
+exit 0

@@ -1,0 +1,17 @@
+TAP version 13
+1..15
+ok     1 - pass
+ok     2 - (null)
+not ok 3 - fail
+not ok 4 - (null)
+ok     5 - skip1 # SKIP reason
+ok     6 - skip2 # SKIP (null)
+ok     7 - (null) # SKIP reason
+ok     8 - (null) # SKIP (null)
+not ok 9 - todo1 # TODO reason
+not ok 10 - todo2 # TODO (null)
+not ok 11 - (null) # TODO reason
+not ok 12 - (null) # TODO (null)
+not ok 13 - ok0
+ok     14 - ok1
+ok     15 - ok-1

@@ -1,0 +1,12 @@
+system */dasd *: object
+system */dasd */alias_count/: number
+system */dasd */chpid_count/: number
+system */dasd */cylinder_count/: number
+system */dasd */block_dev/blksize/: number
+system */dasd */block_dev/size/: number
+system */dasd_count_available/: number
+system */dasd_count_total/: number
+
+# Copied from chpid resource object
+system */dasd */chpid *: object
+system */dasd */chpid */type/: number

@@ -1,0 +1,16 @@
+test:
+  plan:
+    defaults: 'Check that the correct defaults are used for optional arguments'
+    quote_white_space1: 'Check that command parameters with white spaces are properly quoted (part1)'
+    quote_white_space2: 'Check that command parameters with white spaces are properly quoted (part2)'
+    status_code: 'Check that the status code is verified'
+    stdout_stderr_exact_match: 'Check that stdout and stderr pattern matching works as expected'
+    ignore_stdout_stderr: 'Check that stdout and stderr outputs are ignored if ".*" is used'
+    paths_are_used: 'Check that the stdout and stderr is written to the given (optional) paths'
+    paths_are_used_stdout: 'Check that the output in the stdout file is correct'
+    paths_are_used_stderr: 'Check that the output in the stderr file is correct'
+    stdin: 'Check that input can be passed in by using pipes'
+    stdin_here_document: 'Check that input can be passed in by using a `here document`'
+    multiline_pattern_test: 'Check that multiline patterns can be used as regex'
+    multiline_pattern_test2: 'Check that multiline patterns using newlines can be used as regex'
+    quoting_test: 'Check the handling of single quotes in the command line arguments'

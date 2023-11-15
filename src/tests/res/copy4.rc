@@ -1,0 +1,8 @@
+# Dummy 1 copies value of "value" attribute from dummy 2. dummy 1 is defined
+# before dummy 2.
+
+dummy 1:
+  id: 1
+  value: _tela_copy ../../dummy 2/value
+dummy 2:
+  value: 3

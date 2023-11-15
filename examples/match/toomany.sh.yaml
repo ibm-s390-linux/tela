@@ -1,0 +1,8 @@
+# Request 5 dummy resources.
+
+system:
+  dummy a:
+  dummy b:
+  dummy c:
+  dummy d:
+  dummy e:

@@ -1,0 +1,7 @@
+system */iscsi-lun *: object
+system */iscsi-lun */scsi_dev/type/: number
+system */iscsi-lun */scsi_dev/scsi_disk/protection_type/: number
+system */iscsi-lun */block_dev/size/: number
+system */iscsi-lun */block_dev/blksize/: number
+system */iscsi_lun_count_available/: number
+system */iscsi_lun_count_total/: number

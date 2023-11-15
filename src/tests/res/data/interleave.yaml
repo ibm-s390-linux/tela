@@ -1,0 +1,9 @@
+# Check if object counts are correctly generated if object entries in resource
+# YAML file are interleaved with other object types.
+
+# test:   [ "$TELA_SYSTEM_DUMMY_COUNT_AVAILABLE" == 2 ]
+# result: ^ok[^#]*$
+# rc: interleave.rc
+
+dummy a:
+dummy b:

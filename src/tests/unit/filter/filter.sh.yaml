@@ -1,0 +1,5 @@
+test:
+  plan:
+    # Format is <testname>: "<description>"
+    rc: "Check for unexpected return code"
+    output: "Compare actual output vs. expected output"

@@ -1,0 +1,6 @@
+# Check if a zero object count is emitted if no object was specified.
+
+# test:   [ "$TELA_SYSTEM_DUMMY_COUNT_AVAILABLE" == 0 ]
+# test:   [ "$TELA_SYSTEM_DUMMY_COUNT_TOTAL" == 0 ]
+# result: ^ok[^#]*$
+# rc: empty2.rc

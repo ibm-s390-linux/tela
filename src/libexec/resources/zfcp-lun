@@ -1,0 +1,228 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# zfcp-lun - collect state for zfcp-lun resources.
+#
+# Copyright IBM Corp. 2023
+#
+# Usage: zfcp-lun [<datafile>]
+#
+# If a YAML datafile was specified, determine characteristics of all mentioned
+# resources. Otherwise list all available resources.
+#
+
+DATAFILE="$1"
+
+LIBEXEC="${TELA_FRAMEWORK:-$(readlink -f $(dirname $0)/../../..)}"/src/libexec
+
+source $LIBEXEC/lib/common.bash || exit 1
+source $LIBEXEC/lib/resource-scsi-device || exit 1
+
+SCSI_BUS="/sys/bus/scsi/devices"
+# Specific glob for current sysfs layout
+ZFCP_GLOB="/sys/devices/css[0-9a-f]*/[0-9a-f]*.*.*/[0-9a-f]*.*.*/host[0-9]*/rport-[0-9]*/target[0-9]*/[0-9]*:*:*:*"
+ZFCP="/sys/bus/ccw/drivers/zfcp"
+LUNS=()
+
+shopt -s nullglob
+
+function convert_lun() {
+	local var=$1 lun=$2 b0 b1 b2 b3 b4 b5 b6 b7
+
+	printf -v h "%016x" $lun
+
+	# Get byte values
+	b0=${h:0:2}
+	b1=${h:2:2}
+	b2=${h:4:2}
+	b3=${h:6:2}
+	b4=${h:8:2}
+	b5=${h:10:2}
+	b6=${h:12:2}
+	b7=${h:14:2}
+
+	# 0<=>6 1<=>7 2<=>4 3<=>5
+	eval "$var=0x$b6$b7$b4$b5$b2$b3$b0$b1"
+}
+
+function get_zfcp_lun() {
+	local dir="$1" h_var=$2 w_var=$3 l_var=$4
+	local link hbadir wwpndir rport wwpn scsilun
+	local _hba_id _wwpn _fcp_lun
+
+	read link < <(readlink -f "$dir")
+	# /sys/devices/css0/0.0.000f/0.0.190d/host0/rport-0:0-0/
+	#				target0:0:0/0:0:0:1083916290
+
+	# Get HBA
+	hbadir=${link%/*/*/*/*}
+	_hba_id=${hbadir##*/}
+
+	# Get WWPN
+	wwpndir=${link%/*/*}
+	rport=${wwpndir##*/}
+	read _wwpn <"$wwpndir/fc_remote_ports/$rport/port_name"
+
+	# Get FCP LUN
+	scsilun=${dir##*:}
+	convert_lun _fcp_lun $scsilun
+
+	eval "$h_var=$_hba_id"
+	eval "$w_var=$_wwpn"
+	eval "$l_var=$_fcp_lun"
+}
+
+function enumerate_zfcp_luns() {
+	local dir name hba_id wwpn fcp_lun
+
+	for dir in $ZFCP_GLOB ; do
+		if [[ -e $dir/hba_id ]] ; then
+			# Use legacy interface if available
+			read hba_id <$dir/hba_id
+			read wwpn <$dir/wwpn
+			read fcp_lun <$dir/fcp_lun
+		else
+			get_zfcp_lun $dir hba_id wwpn fcp_lun
+		fi
+
+		[[ -z "$hba_id" ]] && continue
+
+		name=${dir##*/}
+
+		# Add to LUNS array
+		LUNS[${#LUNS[@]}]="$name $hba_id:$wwpn:$fcp_lun"
+	done
+}
+
+function check_block_dev() {
+	local dir="$1" var="$2" bdev size blksize
+
+	[[ -e "$dir" ]] || return
+
+	bdev=${dir##*/}
+	bdev=${bdev#block:}
+
+	# size in sectors (512 byte)
+	read size <$dir/size
+	(( size=size*512 ))
+
+	if [[ -e "$bdevdir/queue/logical_block_size" ]] ; then
+		read blksize <"$dir/queue/logical_block_size"
+	else
+		# Fall back to blockdev but this requires root
+		blksize=$(blockdev --getss /dev/$bdev 2>/dev/null)
+	fi
+
+	echo "  block_dev:"
+	echo "    bdev: $bdev"
+	echo "    size: $size"
+	echo "    blksize: $blksize"
+
+	eval "$var=$bdev"
+}
+
+function get_scsi_dir() {
+	local var=$1 id=$2 lun name zfcp_lun
+
+	for lun in "${LUNS[@]}" ; do
+		set -- $lun
+		name=$1
+		zfcp_lun=$2
+		if [[ "$id" == "$zfcp_lun" ]] ; then
+			eval "$var=$SCSI_BUS/$name"
+			return
+		fi
+	done
+
+	eval "$var="
+}
+
+function check_zfcp_lun() {
+	local id="$1" scsidir fcpdev rport wwpn fcplun value bdevdir IFS
+
+	get_scsi_dir scsidir $id
+	[[ -z $scsidir ]] && return 1
+
+	# Check zFCP failed state
+	if [[ -e $scsidir/zfcp_failed ]] ; then
+		read value <$scsidir/zfcp_failed
+		if [[ $value != "0" ]] ; then
+			warn "Ignoring $id due to failed state: $value"
+			return 1
+		fi
+	fi
+
+	# Check SCSI state
+	read value <$scsidir/state
+	if [[ "$value" != "running" ]] ; then
+		warn "Ignoring $id due to state: $value"
+		return 1
+	fi
+
+	IFS=$':'
+	set -- $id
+	unset IFS
+	fcpdev=$1
+	wwpn=$2
+	fcplun=$3
+
+	# Create output
+	echo "zfcp-lun $id:"
+	echo "  id: $id"
+	echo "  fcpdev: $fcpdev"
+	echo "  wwpn: $wwpn"
+	echo "  fcplun: $fcplun"
+
+	# Block device information
+	for bdevdir in $scsidir/block/* $scsidir/block:* ; do
+		check_block_dev $bdevdir bdev_name
+		break
+	done
+
+	# SCSI device type information
+	check_scsi_dev $scsidir $bdev_name
+
+	# Default values for meta-attributes
+	echo "  allow_write: 0"
+
+	return 0
+}
+
+function get_state() {
+	local IFS=$'\n' count=0
+
+	while read -r line ; do
+		[[ "${line:0:9}" != "zfcp-lun " ]] && continue
+		id=${line:9}
+		id="${id%:}"
+
+		check_zfcp_lun "$id" && (( count=count+1 ))
+	done
+	echo "zfcp_lun_count_available: $count"
+}
+
+function get_all() {
+	local do_list=$1 id count=0
+
+	for lun in "${LUNS[@]}" ; do
+		set -- $lun
+		id=$2
+		(( count=count+1 ))
+		[[ $do_list == 1 ]] && echo "zfcp-lun $id:"
+	done
+
+	[[ $do_list == 0 ]] && echo "zfcp_lun_count_total: $count"
+}
+
+enumerate_zfcp_luns
+
+if [[ -n "$DATAFILE" ]] ; then
+	# Get state for resources specified in datafile
+	get_state <"$DATAFILE"
+	get_all 0
+else
+	# Get list of all available resources
+	get_all 1
+fi
+
+exit 0

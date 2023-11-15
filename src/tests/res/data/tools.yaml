@@ -1,0 +1,6 @@
+# result: ^ok[^#]*$
+
+system:
+  tools:
+    /bin/sh: /bin/sh
+    /bin/sh:

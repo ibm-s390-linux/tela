@@ -1,0 +1,5 @@
+system localhost:
+  attr: 0
+  _tela_final: 1
+system remote:
+  _tela_final: 1

@@ -1,0 +1,59 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# remote_system - remote system resource state collector.
+#
+# Copyright IBM Corp. 2023
+#
+# Usage: remote_system <system> <sysin>
+#
+# Collect system state information for the remote SYSTEM. SYSIN specifies the
+# input file for the system state script.
+#
+
+if [[ -z "$TELA_FRAMEWORK" ]] ; then
+	TOOLPATH=$(readlink -f ${0%/*})
+	TELA_FRAMEWORK="${TOOLPATH%tela/src/*}tela"
+fi
+LIBEXEC="$TELA_FRAMEWORK/src/libexec"
+TELA_TOOL="$TELA_FRAMEWORK/src/tela"
+
+source $LIBEXEC/lib/common.bash || exit 1
+
+SYSTEM=$1
+SYSIN=$2
+
+if [[ -z "$SYSTEM" || -z "$SYSIN" ]] ; then
+	echo "Usage: $0 <system> <sysin>" >&2
+	exit 1
+fi
+
+SYSIN_BASE=${SYSIN##*/}
+USER=
+HOST=
+
+# Get SSH user and hostname from sysin file
+IFS=$'\n'
+while read -r line ; do
+	eval "$line"
+	case $YAMLPATH in
+	*/ssh/user/) USER="$VALUE" ;;
+	*/ssh/host/) HOST="$VALUE" ;;
+	esac
+done < <($TELA_TOOL yamlget "$SYSIN" "system $SYSTEM/ssh/user/" \
+				     "system $SYSTEM/ssh/host/")
+
+[[ -z "$HOST" ]] && die "system $SYSTEM: No host information provided"
+[[ -z "$USER" ]] && die "system $SYSTEM: No user information provided"
+
+eval "export TELA_SYSTEM_${SYSTEM}_SSH_USER=\"$USER\""
+eval "export TELA_SYSTEM_${SYSTEM}_SSH_HOST=\"$HOST\""
+
+exec $LIBEXEC/remote -l $LIBEXEC -l $SYSIN $SYSTEM - <<EOF
+mkdir -p tela/src
+mv libexec tela/src
+export _TELA_RTMP="\$(pwd)"
+export TELA_FRAMEWORK="\$_TELA_RTMP/tela"
+cd "\$TELA_FRAMEWORK/src/libexec/resources/"
+"\$TELA_FRAMEWORK/src/libexec/resources/system" "\$_TELA_RTMP/$SYSIN_BASE"
+EOF

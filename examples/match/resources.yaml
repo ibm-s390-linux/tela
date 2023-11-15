@@ -1,0 +1,7 @@
+system localhost:
+  dummy res_1:
+    size: 1000
+  dummy res_2:
+    size: 5000
+  dummy res_3:
+    size: 20000

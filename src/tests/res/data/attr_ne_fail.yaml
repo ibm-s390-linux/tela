@@ -1,0 +1,7 @@
+# result:  ^ok.*# SKIP Missing
+# rc:      same.rc
+
+dummy a:
+  size: %{size1}
+dummy b:
+  size: != %{size1}

@@ -1,0 +1,4 @@
+[codespell]
+ignore-words = .codespell.ignore
+count = ''
+quiet-level = 35

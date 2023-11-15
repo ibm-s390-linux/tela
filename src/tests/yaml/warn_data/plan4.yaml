@@ -1,0 +1,5 @@
+# Expect: Plan mismatch (missing tests: test1)
+
+test:
+  plan:
+    test1: "Description of test1"

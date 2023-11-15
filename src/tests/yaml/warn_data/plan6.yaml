@@ -1,0 +1,11 @@
+# Expect: Plan mismatch (plan=1, actual=2)
+# BEGIN TAP13
+# TAP version 13
+# 1..1
+# ok 1 - test1
+# ok 2 - test2
+# END TAP13
+
+test:
+  plan:
+    test1: "Description of test1"

@@ -1,0 +1,7 @@
+# Check if circular copy references don't lead to lock-up and warnings
+# are generated.
+#
+# result:  ^# WARNING: .* Unresolved copy reference
+# rc: copy3.rc
+
+dummy a:

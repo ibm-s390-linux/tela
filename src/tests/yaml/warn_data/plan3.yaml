@@ -1,0 +1,5 @@
+# Expect: Wrong type, expect either mapping or scalar
+
+test:
+  plan:
+    - 1

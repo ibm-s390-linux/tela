@@ -1,0 +1,8 @@
+# test:   [ "$TELA_SYSTEM_DUMMY_a_SIZE" == 2 ]
+# test:   [ "$TELA_SYSTEM_DUMMY_b_SIZE" == 1 ]
+# result: ^ok[^#]*$
+
+dummy a:
+  size: 2
+dummy b:
+  size: 1

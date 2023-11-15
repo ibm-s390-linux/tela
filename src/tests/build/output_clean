@@ -1,0 +1,3 @@
+  CLEAN   src/tests/build
+  CLEAN   src/tests/build/dir1
+  CLEAN   src/tests/build/dir2

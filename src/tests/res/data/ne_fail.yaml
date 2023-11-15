@@ -1,0 +1,5 @@
+# rc: single.rc
+# result:  ^ok.*# SKIP Missing
+
+dummy a:
+  size: != l

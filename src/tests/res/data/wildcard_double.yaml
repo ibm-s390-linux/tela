@@ -1,0 +1,10 @@
+# Check if double wildcard requirements match all objects.
+#
+# test:   [ "$TELA_SYSTEM_DUMMY_0_SIZE" == 1 ]
+# test:   [ "$TELA_SYSTEM_DUMMY_1_SIZE" == 2 ]
+# test:   [ "$TELA_SYSTEM_DUMMY_2_SIZE" == 3 ]
+# result: ^ok[^#]*$
+# rc: triple.rc
+
+dummy *:
+dummy *:

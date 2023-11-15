@@ -1,0 +1,16 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# diag - tool to collect system diagnostics data for test logs.
+#
+# Copyright IBM Corp. 2023
+#
+# Print diagnostics data about the test machine. The output of this script
+# will be attached the start of each test log.
+#
+
+OS_RELEASE=/etc/os-release
+
+echo "hostname: $(hostname)"
+$(readlink -f $(dirname $0))/os | sed -e 's/^  //g'
+echo "uname: $(uname -a)"

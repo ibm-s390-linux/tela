@@ -1,0 +1,41 @@
+Before (root=non-null):
+==================================
+  replace:
+  replace:
+  replace:
+  replace:
+    replace:
+      replace:
+  replace:
+  replace:
+  replace:
+==================================
+
+Callback:
+==================================
+replace                                 : replace:
+*** Replacing node
+replace                                 : replace:
+*** Replacing node
+replace                                 : replace:
+*** Replacing node
+replace                                 : replace:
+*** Replacing node
+replace                                 : replace:
+*** Replacing node
+replace                                 : replace:
+*** Replacing node
+replace                                 : replace:
+*** Replacing node
+==================================
+
+After (root=non-null):
+==================================
+  replacement
+  replacement
+  replacement
+  replacement
+  replacement
+  replacement
+  replacement
+==================================

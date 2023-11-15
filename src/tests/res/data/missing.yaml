@@ -1,0 +1,8 @@
+# result:  ^ok.*# SKIP Missing
+
+dummy a:
+  size: 1
+dummy b:
+  size: 2
+dummy c:
+  size: 3

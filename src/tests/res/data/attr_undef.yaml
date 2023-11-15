@@ -1,0 +1,4 @@
+# result:  undefined variable
+
+dummy a:
+  size: > %{size}

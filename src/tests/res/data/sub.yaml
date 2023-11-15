@@ -1,0 +1,10 @@
+# Check if sub-objects are correctly matched.
+#
+# test:   [ "$TELA_SYSTEM_DUMMY_a_SIZE" == 2 ]
+# test:   [ "$TELA_SYSTEM_DUMMY_a_SUB_b_SIZE" == 4 ]
+# result: ^ok[^#]*$
+# rc: sub.rc
+
+dummy a:
+  sub b:
+    size: 4

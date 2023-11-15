@@ -1,0 +1,31 @@
+# Check that number unit prefixes work as expected
+#
+# test:   [ "$TELA_SYSTEM_DUMMY_a_SIZE" == 1099511627776 ]
+# test:   [ "$TELA_SYSTEM_DUMMY_b_SIZE" == 1048576 ]
+# test:   [ "$TELA_SYSTEM_DUMMY_c_SIZE" == 1000000 ]
+# test:   [ "$TELA_SYSTEM_DUMMY_d_SIZE" == 1000000000000 ]
+# test:   [ "$TELA_SYSTEM_DUMMY_e_SIZE" == 1000000000 ]
+# test:   [ "$TELA_SYSTEM_DUMMY_f_SIZE" == 1024 ]
+# test:   [ "$TELA_SYSTEM_DUMMY_g_SIZE" == 1073741824 ]
+# test:   [ "$TELA_SYSTEM_DUMMY_h_SIZE" == 1000 ]
+#
+# rc: prefix.rc
+# result: ^ok[^#]*$
+
+system:
+  dummy a:
+    size: 1Ti
+  dummy b:
+    size: 1 MiB
+  dummy c:
+    size: 1m
+  dummy d:
+    size: 1 T
+  dummy e:
+    size: 1 g
+  dummy f:
+    size: 1ki
+  dummy g:
+    size: 1 GiB
+  dummy h:
+    size: 1K

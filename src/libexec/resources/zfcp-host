@@ -1,0 +1,180 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# zfcp-host - collect state for zfcp-host resources.
+#
+# Copyright IBM Corp. 2023
+#
+# Usage: zfcp-host [<datafile>]
+#
+# If a YAML datafile was specified, determine characteristics of all mentioned
+# resources. Otherwise list all available resources.
+#
+
+DATAFILE="$1"
+
+LIBEXEC="${TELA_FRAMEWORK:-$(readlink -f $(dirname $0)/../../..)}"/src/libexec
+
+source $LIBEXEC/lib/common.bash || exit 1
+
+ZFCP="/sys/bus/ccw/drivers/zfcp"
+
+shopt -s nullglob
+
+function check_attr() {
+	local sysfs="$1" attr="$2" indent="$3" value
+
+	read value 2>/dev/null <"$sysfs/$attr" || return
+	[[ "$value" =~ ' ' ]] && value="\"$value\""
+	[[ -z "$indent" ]] && indent=0
+	printf "%*s%s: %s\n" $indent "" $attr $value
+}
+
+function check_speed() {
+	local speed="$1" value unit IFS=' '
+
+	set -- $speed
+	value=$1
+	unit=$2
+
+	case "$unit" in
+	"Gbit")
+		(( value=value*1000000000 ))
+		;;
+	*)	warn "Unknown unit $unit"
+		return
+		;;
+	esac
+
+	echo "    speed: $value"
+}
+function check_fc_host() {
+	local sysfs="$1" speed name IFS=$'\n'
+
+	[[ -e "$sysfs" ]] || return
+
+	echo "  fc_host:"
+	check_attr $sysfs port_name 4
+	check_attr $sysfs permanent_port_name 4
+	check_attr $sysfs port_type 4
+	check_attr $sysfs port_id 4
+	check_attr $sysfs serial_number 4
+
+	if read speed 2>/dev/null < $sysfs/speed ; then
+		check_speed "$speed"
+	fi
+}
+
+function check_scsi_host() {
+	local sysfs="$1"
+
+	[[ -e "$sysfs" ]] || return
+
+	echo "  scsi_host:"
+	check_attr $sysfs prot_capabilities 4
+	check_attr $sysfs prot_guard_type 4
+}
+
+function check_dr() {
+	local status="$1" dr
+
+	dr=$((status & 1))
+
+	echo "  datarouter: $dr"
+}
+
+function check_zfcp_host() {
+	local id="$1" sysfs online ver status value dir
+
+	canonical_ccwdev_id id $id || return 1
+	sysfs="$ZFCP/$id"
+
+	[[ -e "$sysfs" ]] || return 1
+
+	# Check CCW device availability
+	read value <$sysfs/availability
+	if [[ $value != "good" ]] ; then
+		warn "Ignoring $id due to availability: $value"
+		return 1
+	fi
+
+	# Check zFCP failed state
+	if [[ -e $sysfs/failed ]] ; then
+		read value <$sysfs/failed
+		if [[ $value != "0" ]] ; then
+			warn "Ignoring $id due to failed state: $value"
+			return 1
+		fi
+	fi
+
+	# Get additional data
+	read online <$sysfs/online
+	read status 2>/dev/null <$sysfs/status
+
+	# Create output
+	echo "zfcp-host $id:"
+	echo "  busid: $id"
+	echo "  sysfs: $sysfs"
+
+	# Default values for meta-attributes
+	echo "  allow_inject: 0"
+
+	check_ccwdev_chpids "$id" "  " "_tela_copy ../../chpid " 1 ""
+	check_attr $sysfs online 2
+	check_attr $sysfs card_version 2
+	check_attr $sysfs lic_version 2
+	check_dr $status
+
+	# Get FC host data
+	for dir in $sysfs/host*/fc_host/host* $sysfs/host*/fc_host:*/ ; do
+		check_fc_host $dir
+		break
+	done
+
+	# Get SCSI host data
+	for dir in $sysfs/host*/scsi_host/host* $sysfs/host*/scsi_host:*/ ; do
+		check_scsi_host $dir
+		break;
+	done
+
+	return 0
+}
+
+function get_state() {
+	local IFS=$'\n' count=0
+
+	while read -r line ; do
+		[ ${line:0:10} != "zfcp-host " ] && continue
+		id=${line:10}
+		id="${id%:}"
+
+		check_zfcp_host "$id" && (( count=count+1 ))
+	done
+	echo "zfcp_host_count_available: $count"
+}
+
+function get_all() {
+	local do_list=$1 sysfs base count=0
+
+	for sysfs in /sys/bus/ccw/drivers/zfcp/* ; do
+		base=${sysfs##*/}
+
+		# Note: [.] needed due to inconsistent behavior of older Bash
+		if [[ $base =~ [.] ]] ; then
+			(( count=count+1 ))
+			[[ $do_list == 1 ]] && echo "zfcp-host $base:"
+		fi
+	done
+	[[ $do_list == 0 ]] && echo "zfcp_host_count_total: $count"
+}
+
+if [ -n "$DATAFILE" ] ; then
+	# Get state for resources specified in datafile
+	get_state <"$DATAFILE"
+	get_all 0
+else
+	# Get list of all available resources
+	get_all 1
+fi
+
+exit 0

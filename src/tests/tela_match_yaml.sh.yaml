@@ -1,0 +1,9 @@
+test:
+  plan:
+    # Format is <testname>: "<description>"
+    match_rc: "The exit code of tela match must be 0"
+    sys_object_id: "There must be an object id for the system object in YAML output"
+    dummy_object_id: "There must be an object id for the dummy object in YAML output"
+    dummy_val: "The dummy val attribute must be present in YAML output"
+    dummy_num: "The dummy num attribute must be present in YAML output"
+    num_dummys: "Only one dummy object must be listed in YAML output"

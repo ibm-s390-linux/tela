@@ -1,0 +1,123 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# packages - collect state of installed packages.
+#
+# Copyright IBM Corp. 2023
+#
+# Usage: packages [<datafile>]
+#
+# Get version of packages specified in datafile. Filter out packages that are
+# not installed. Map package names according to rules in file 'packages.alias'.
+#
+# Example input (datafile):
+#
+#   packages:
+#     bash:
+#     perl:
+#     unknown:
+#
+# Example output (stdout):
+#
+#   packages:
+#     bash: 4.0
+#     perl: 5.8
+#
+
+DATAFILE="$1"
+
+# Adjust package name for this OS
+function get_alias() {
+	local IFS var="$1" name="$2" pkg list entry os alt
+
+	while read -r pkg list ; do
+		[[ "$pkg" == "$name:" ]] || continue
+		for entry in $list ; do
+			os=${entry%%:*}
+			alt=${entry#*:}
+			alt=${alt//|/ }
+			if [[ "$TELA_OS_ID-$TELA_OS_VERSION" =~ ^$os ]] ; then
+				eval "$var=($alt)"
+				return
+			fi
+		done
+	done < packages.alias
+
+	eval "$var=$name"
+}
+
+# Check status and version of specified package using RPM
+function check_rpm() {
+	local IFS name="$1" name2 ver pkg buffer
+
+	# Get alternate name for package on this OS
+	get_alias name2 $name
+
+	#  Get package version
+	for pkg in "${name2[@]}"; do
+		read buffer < <(rpm --query --queryformat '%{VERSION}\n' $pkg)
+		[[ "$buffer" =~ "not installed" ]] && return
+		[[ -z "$ver" ]] && ver="$buffer"
+	done
+
+	# Emit result as YAML
+	echo "  $name: $ver"
+}
+
+# Check status and version of specified package using DPKG
+function check_dpkg() {
+	local IFS name="$1" name2 ver pkg buffer
+
+	# Get alternate name for package on this OS
+	get_alias name2 $name
+
+	#  Get package version
+	for pkg in "${name2[@]}"; do
+		read buffer < <(dpkg-query --show --showformat '${Version}\n' \
+					${pkg} 2>/dev/null) || return
+		[[ -z "$buffer" ]] && return
+		[[ -z "$ver" ]] && ver="$buffer"
+	done
+
+	# Emit result as YAML
+	echo "  $name: $ver"
+}
+
+function get_state() {
+	local check line id
+
+	# Determine package manager
+	check=
+	case "$TELA_OS_ID" in
+		rhel|sles|fedora|linuxonzdriver)
+			check=check_rpm
+			;;
+		ubuntu|debian)
+			check=check_dpkg
+			;;
+		*)
+			die "Unsupported OS '$TELA_OS_ID'"
+			;;
+	esac
+
+	IFS=$'\n'
+
+	# Header
+	read line
+	[[ -n "$line" ]] && echo "$line"
+
+	# Check each package
+	while read -r line ; do
+		id=${line:2}
+		id="${id%%:*}"
+
+		$check $id
+	done
+}
+
+if [ -n "$DATAFILE" ] ; then
+	# Get state for resources specified in datafile
+	get_state <"$DATAFILE"
+fi
+
+exit 0

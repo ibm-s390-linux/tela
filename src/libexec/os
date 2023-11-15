@@ -1,0 +1,70 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# os - print operating system ID and VERSION_ID.
+#
+# Copyright IBM Corp. 2023
+#
+
+OS_RELEASE=/etc/os-release
+REDHAT_RELEASE=/etc/redhat-release
+SUSE_RELEASE=/etc/SuSE-release
+
+function print_os() {
+	local id="$1" ver="$2"
+
+	echo "  os:"
+	echo "    id: $id"
+	echo "    version: $ver"
+}
+
+# Generic OS release file
+if [ -e $OS_RELEASE ] ; then
+	source $OS_RELEASE 2>/dev/null
+
+	print_os "$ID" "$VERSION_ID"
+	exit 0
+fi
+
+# Red Hat specific release file
+if [ -e $REDHAT_RELEASE ] ; then
+	VER=$(sed \
+        -e 's/.*red hat enterprise linux .*release \([0-9]\+\.[0-9]\+\).*/\1/i;t' \
+        -e 's/.*red hat enterprise linux .*release \([0-9]\+\).*update \([0-9]\+\).*/\1.\2/i;t' \
+        -e 's/.*red hat enterprise linux .*release \([0-9]\+\).*/\1.0/i;t' \
+        -e 'd'\
+        < $REDHAT_RELEASE)
+
+	print_os "rhel" "$VER"
+	exit 0
+fi
+
+# SUSE specific release file
+if [ -e $SUSE_RELEASE ] ; then
+	VERSION=0
+	PATCHLEVEL=0
+
+	IFS="= " ; while read -r KEYWORD VALUE ; do
+		case $KEYWORD in
+		VERSION)
+			VERSION=$VALUE
+			;;
+		PATCHLEVEL)
+			PATCHLEVEL=$VALUE
+			;;
+		esac
+	done < $SUSE_RELEASE
+
+	print_os "sles" "${VERSION}.${PATCHLEVEL}"
+	exit 0
+fi
+
+# LSB release tool
+VER=$(lsb_release -s -i -r 2>/dev/null | tr [A-Z] [a-z])
+if [ -n "$VER" ] ; then
+	set -- $VER
+	print_os "$1" "$2"
+	exit 0
+fi
+
+exit 1

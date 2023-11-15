@@ -1,0 +1,8 @@
+# test:   [ "$TELA_SYSTEM_DUMMY_a_SIZE" != "$TELA_SYSTEM_DUMMY_b_SIZE" ]
+# result: ^ok[^#]*$
+# rc:     double.rc
+
+dummy a:
+  size: %{size1}
+dummy b:
+  size: != %{size1}

@@ -1,0 +1,12 @@
+root:
+  map1: key2
+  map2:
+    map3:
+      key3:
+  map4:
+  replace_c:
+    - seq 1
+    - seq 2
+  map6:
+    scalar 1
+    scalar 2

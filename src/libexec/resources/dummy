@@ -1,0 +1,44 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# dummy - sample resource script implementation
+#
+# Copyright IBM Corp. 2023
+#
+# This script collects the state for dummy resources. It is intended for
+# demonstration and testing purpose only.
+#
+# Usage: dummy [<datafile>]
+#
+# If a YAML datafile was specified, determine characteristics of all mentioned
+# resources. Otherwise list all available resources.
+#
+
+DATAFILE="$1"
+
+function get_state() {
+	local IFS=$'\n' count=0
+
+	while read -r line ; do
+		# The dummy resource accepts all attributes
+		echo $line
+		[[ ${line:0:6} == "dummy " ]] && (( count++ ))
+	done
+	echo "dummy_count_available: $count"
+	echo "dummy_count_total: $count"
+}
+
+function list_all() {
+	# No default dummy devices
+	:
+}
+
+if [ -n "$DATAFILE" ] ; then
+	# Get state for resources in specified datafile
+	get_state <"$DATAFILE"
+else
+	# Get list of all available resources
+	list_all
+fi
+
+exit 0

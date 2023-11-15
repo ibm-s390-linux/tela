@@ -1,0 +1,145 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# virtio-scsi-lun - collect state for virtio-scsi(-ccw)-lun resources.
+#
+# Copyright IBM Corp. 2023
+#
+# Usage: virtio-scsi-lun [<datafile>]
+#
+# If a YAML datafile was specified, determine characteristics of all mentioned
+# resources. Otherwise list all available resources.
+#
+
+DATAFILE="$1"
+
+LIBEXEC="${TELA_FRAMEWORK:-$(readlink -f $(dirname $0)/../../..)}"/src/libexec
+
+source $LIBEXEC/lib/common.bash || exit 1
+source $LIBEXEC/lib/resource-scsi-device || exit 1
+
+shopt -s nullglob
+
+function check_block_dev() {
+	local dir="$1" var="$2" bdev size blksize
+
+	[[ -e "$dir" ]] || return
+
+	bdev=${dir##*/}
+	bdev=${bdev#block:}
+
+	# size in sectors (512 byte)
+	read size <$dir/size
+	(( size=size*512 ))
+
+	if [[ -e "$bdevdir/queue/logical_block_size" ]] ; then
+		read blksize <"$dir/queue/logical_block_size"
+	else
+		# Fall back to blockdev but this requires root
+		blksize=$(blockdev --getss /dev/$bdev 2>/dev/null)
+	fi
+
+	echo "  block_dev:"
+	echo "    bdev: $bdev"
+	echo "    size: $size"
+	echo "    blksize: $blksize"
+
+	eval "$var=$bdev"
+}
+
+function check_virtio_scsi_lun() {
+	local id="$1" scsidir host vscsi shostno ct starget value
+
+	# Example id: ccw-0.0.0003-virtio-0:1:10
+	local IFS=-
+	set -- $id
+	unset IFS
+	host=$2
+	vscsi=$4
+
+	ct=${vscsi%:*} # strip SCSI_LUN to get SCSI_CHANNEL:SCSI_TARGET
+	set -- /sys/bus/ccw/devices/${host}/virtio[0-9]*/host[0-9]*
+	scsidir=$1
+	shostno=${scsidir##*/host}
+	starget=${shostno}:${ct}
+	set -- /sys/bus/ccw/devices/${host}/virtio[0-9]*/host${shostno}/target${starget}/${shostno}:${vscsi}
+	scsidir=$1
+
+	[ -d "$scsidir" ] || return 1
+
+	# Check SCSI state
+	read value <$scsidir/state
+	if [[ "$value" != "running" ]] ; then
+		warn "Ignoring $id due to state: $value"
+		return 1
+	fi
+
+	# Create output
+	echo "virtio-scsi-lun $id:"
+	echo "  id: $id"
+	echo "  hba: $host"
+	echo "  ctl: $vscsi"
+
+	# Block device information
+	for bdevdir in $scsidir/block/* $scsidir/block:* ; do
+		check_block_dev $bdevdir bdev_name
+		break
+	done
+
+	# SCSI device type information
+	check_scsi_dev "$scsidir" "$bdev_name"
+
+	# Default values for meta-attributes
+	echo "  allow_write: 0"
+
+	return 0
+}
+
+
+
+function get_state() {
+	local IFS=$'\n'
+
+	while read -r line ; do
+		[ ${line:0:16} != "virtio-scsi-lun " ] && continue
+		id=${line:16}
+		id="${id%:}"
+
+		check_virtio_scsi_lun "$id"
+	done
+}
+
+function list_all() {
+	local id sysreal sdevname vscsi subsystem hba
+
+	for sys in /sys/class/scsi_device/*:*:*:*/device/; do
+		sysreal=$(readlink -e $sys)
+		[ -n "${sysreal//*\/virtio[0-9]*}" ] && continue # skip others
+		sdevname=${sysreal##*/} # basename
+		vscsi=${sdevname#*:} # strip SCSI host prefix
+		hba=""
+		while [ -n "$sysreal" ]; do
+			# ascend to parent: strip last path part
+			sysreal=${sysreal%/*}
+			[ -h $sysreal/subsystem ] || continue
+			local subsystem=$(readlink -e $sysreal/subsystem)
+			if [ "${subsystem##*/}" = "ccw" ]; then
+				hba=${sysreal##*/}
+				break
+			fi
+		done
+		[ -z "$hba" ] && continue # skip unknown hba bus type
+		id="ccw-$hba-virtio-$vscsi"
+		echo "virtio-scsi-lun $id:"
+	done
+}
+
+if [ -n "$DATAFILE" ] ; then
+	# Get state for resources specified in datafile
+	get_state <"$DATAFILE"
+else
+	# Get list of all available resources
+	list_all
+fi
+
+exit 0

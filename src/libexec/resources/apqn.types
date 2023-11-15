@@ -1,0 +1,4 @@
+system */apqn *: object
+system */apqn */cex_level/: number
+system */apqn */raw_hwtype/: number
+system */apqn */ap_functions/: number

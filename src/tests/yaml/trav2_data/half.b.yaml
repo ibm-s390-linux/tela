@@ -1,0 +1,12 @@
+root:
+  map1b: key2
+  map2:
+    map3:
+      key3:
+  map4b:
+  map5:
+    - seq 1b
+    - seq 2
+  map6:
+    scalar 1
+    scalar 2b

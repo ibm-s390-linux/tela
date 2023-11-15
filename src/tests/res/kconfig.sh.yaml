@@ -1,0 +1,6 @@
+test:
+  plan:
+    # Format is <testname>: "<description>"
+    kconfig_ok: "Check dependency on known base config symbol"
+    kconfig_not_set: "Check without dependency"
+    kconfig_not_ok: "Check with dependency on non-existent config symbol"

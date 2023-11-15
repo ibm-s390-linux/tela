@@ -1,0 +1,3 @@
+include ../../../tela.mak
+
+TESTS :=

@@ -1,0 +1,13 @@
+system */zfcp-host *: object
+system */zfcp-host */card_version/: number
+system */zfcp-host */lic_version/: number
+system */zfcp-host */status/: number
+system */zfcp-host */fc_host/speed/: number
+system */zfcp-host */scsi_host/prot_capabilities/: number
+system */zfcp-host */scsi_host/prot_guard_type/: number
+system */zfcp_host_count_available/: number
+system */zfcp_host_count_total/: number
+
+# Copied from chpid resource object
+system */zfcp-host */chpid *: object
+system */zfcp-host */chpid */type/: number

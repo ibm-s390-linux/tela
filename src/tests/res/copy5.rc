@@ -1,0 +1,4 @@
+# Self-reference
+
+dummy 1:
+  value: _tela_copy ../../dummy 1/value

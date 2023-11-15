@@ -1,0 +1,17 @@
+system:
+  dummy Ki:
+    size: 1024
+  dummy Mi:
+    size: 1048576
+  dummy Gi:
+    size: 1073741824
+  dummy Ti:
+    size: 1099511627776
+  dummy K:
+    size: 1000
+  dummy M:
+    size: 1000000
+  dummy G:
+    size: 1000000000
+  dummy T:
+    size: 1000000000000
