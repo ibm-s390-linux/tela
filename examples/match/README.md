@@ -1,11 +1,8 @@
-Tela API examples
-=================
+Resource matching examples
+==========================
 
-This directory contains sample testcases that demonstrate tela's APIs:
-
- 1. Sample Makefile listing testcases and build recipes for compiled tests
- 2. Simple testcases written in both Bash and C
- 3. Testcases using tela's Bash and C APIs
+This directory contains sample resource matching configurations to showcase
+how tela handles resource management for test cases.
 
 Use `make check` to run all testcases. Detailed test output in TAP13 format
 can be found in the resulting file `test.log`.
@@ -16,20 +13,40 @@ can be found in the resulting file `test.log`.
 
   Main Makefile defining testcase list and build recipes for compiled tests
 
-- `dev_null.c`
+- `resources.yaml`
 
-  Simple testcase written in C.
+  List of all resources available for the current test cases.
 
-- `day.c`
-  `day.yaml`
+- `all.yaml`
 
-  Testcase that reports multiple test results using the tela C API.
+  Match all available resources but make sure at least two are matched
 
-- `monday.sh`
+- `all.sh`
 
-  Simple testcase written in Bash.
+  Output all matched resources with their attributes.
 
-- `time.sh`
-  `time.sh.yaml`
+- `big.yaml`
 
-  Testcase that reports multiple test results using the tela Bash API.
+  Try to match a resource with the desired size.
+
+- `one.yaml`
+
+  Try to match a single resource.
+
+- `big.sh`
+  `one.sh`
+
+  Output matched resource(s).
+
+- `toobig.yaml`
+
+  Try to match a resource with impossibly big size.
+
+- `toomany.yaml`
+
+  Try to match more resources than available.
+
+- `toobig.sh`
+  `toomany.sh`
+
+  Skip tests since resource matching will fail.
