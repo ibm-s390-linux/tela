@@ -214,7 +214,7 @@ if [[ -n "$_TELA_TMPDIR" ]] ; then
 		debug "Create persistent SSH control socket to $USER@$HOST"
 		# Note: >/dev/null required here to prevent tela from blocking
 		# during read from pipe
-		$SSH "${SSH_OPTS[@]}" -M -S $CTLSOCKET -N -f $USER@$HOST \
+		$SSH "${SSH_OPTS[@]}" -M -S $CTLSOCKET -o "ControlPersist 60s" -N -f $USER@$HOST \
 			>/dev/null 2>&1 || \
 			die "SSH connection to $USER@$HOST failed"
 	fi
