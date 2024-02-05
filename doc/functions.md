@@ -243,17 +243,17 @@ must therefore not install a handler for the EXIT event via the trap command.
 
    @cmd: Command line to run
    @name: Test name
-   @expect_rc: Expected exit code
-   @expect_stdout: Flag indicating whether output on stdout is expected
-   @expect_stderr: Flag indicating whether output on stderr is expected
+   @expect\_rc: Expected exit code
+   @expect\_stdout: Flag indicating whether output on stdout is expected
+   @expect\_stderr: Flag indicating whether output on stderr is expected
 
    Run command line @cmd and report success for test @name if the command
    exit code and output on stdout and stderr match expected values.
 
-   @expect_rc defines the expected exit code. Non-zero @expect_stdout and
-   @expect_stderr values indicate that output is expected on stdout and stderr
+   @expect\_rc defines the expected exit code. Non-zero @expect\_stdout and
+   @expect\_stderr values indicate that output is expected on stdout and stderr
    respectively. If a value of 2 is provided it is ignored if there is an actual
    output on stderr/stdout or not but it is still printed.
 
-   After this function returns, command output will be available in $TELA_TMP
-   named ${@name}_stdout and ${@name}_stderr.
+   After this function returns, command output will be available in directory
+   $TELA\_TMP named ${@name}\_stdout and ${@name}\_stderr.
