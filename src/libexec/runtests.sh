@@ -146,6 +146,8 @@ if [[ -z "$_TELA_RUNNING" ]] ; then
 	# Do this only once at start of test run
 	checkscripts "BEFORE" "$TELA_BEFORE"
 	checkscripts "AFTER" "$TELA_AFTER"
+	checkscripts "PREEXEC" "$TELA_PREEXEC"
+	checkscripts "POSTEXEC" "$TELA_POSTEXEC"
 
 	export _TELA_RUNNING=1
 	_TELA_TMPDIR=$(mktemp -d) || die "Could not create temporary directory"
@@ -169,6 +171,8 @@ if [[ -z "$_TELA_RUNNING" ]] ; then
 		die "$P: Empty TESTS variable"
 	fi
 
+	runscripts "$TELA_PREEXEC" "$TELA_TESTSUITE" "$TELA_WRITELOG"
+
 	runtests "${TESTS[@]}" | $TELA_TOOL format - "$NUM" 1 || exit 1
 	if [[ -d "$_TELA_FILE_ARCHIVE" ]]; then
 		tar -czf "$TELA_WRITEDATA" -C "$_TELA_FILE_ARCHIVE" .
@@ -176,6 +180,14 @@ if [[ -z "$_TELA_RUNNING" ]] ; then
 	fi
 
 	if grep -q '^not ok' "${TELA_WRITELOG}"; then
+		TESTS_FAILED=1
+	else
+		TESTS_FAILED=0
+	fi
+
+	runscripts "$TELA_POSTEXEC" "$TELA_TESTSUITE" "$TELA_WRITELOG" "$TESTS_FAILED"
+
+	if [[ "$TESTS_FAILED" -ne 0 ]] ; then
 		echo 'Tests have failed' >&2
 		exit "${EXIT_FAIL}"
 	fi

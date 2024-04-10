@@ -60,6 +60,8 @@ help:
 	@echo "  COLOR=0|1|auto  Control use of color in formatted output (default: auto)"
 	@echo "  SCOPE=<value>   Control the test scope (default: quick)"
 	@echo "  CACHE=0|1       Control caching of system state data (default: 0)"
+	@echo "  PREEXEC=<cmds>  Colon-separated list of commands to run before the first test starts"
+	@echo "  POSTEXEC=<cmds> Colon-separated list of commands to run after the last test ended"
 	@echo "  BEFORE=<cmds>   Colon-separated list of commands to run before test start"
 	@echo "  AFTER=<cmds>    Colon-separated list of commands to run after test end"
 	@echo "  SKIPFILE=<file> Skip over tests listed or matched by shell pattern in <file>"

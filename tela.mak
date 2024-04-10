@@ -38,6 +38,8 @@ export TELA_SCOPE    ?= $(SCOPE)
 export TELA_CACHE    ?= $(CACHE)
 export TELA_BEFORE   ?= $(BEFORE)
 export TELA_AFTER    ?= $(AFTER)
+export TELA_PREEXEC  ?= $(PREEXEC)
+export TELA_POSTEXEC ?= $(POSTEXEC)
 export TELA_LIB      ?= $(LIBEXEC)/lib
 
 export TELA_WRITELOG  ?= $(LOG)
