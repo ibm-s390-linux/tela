@@ -10,7 +10,7 @@ cd skip_names 2>/dev/null
 MAKE_STDERR="$TELA_TMP/stderr"
 ACTUAL="$TELA_TMP/actual.log"
 ACTUAL_SHORT="$TELA_TMP/actual-short.log"
-EXPECT_SHORT="expect-short.log"
+EXPECT_SHORT="expect-short.out"
 
 echo "Get TAP13 output for sample tests"
 ../build_make.sh check PRETTY=0 2>"$MAKE_STDERR" >"$ACTUAL"

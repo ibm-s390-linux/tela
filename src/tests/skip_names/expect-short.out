@@ -1,0 +1,11 @@
+ok     1 - simple_noplan.sh # SKIP Missing dummy x/nonexistent: 1
+ok     2 - simple_nosub.sh # SKIP Missing dummy x
+  desc: "desc for simple_nosub.sh"
+ok     3 - simple_sub.sh:test1 # SKIP Missing dummy x/nonexistent: 1
+  desc: "desc for test1"
+ok     4 - multi_sub.sh:test1 # SKIP Missing dummy x/nonexistent: 1
+  desc: "desc for test1"
+ok     5 - multi_sub.sh:test2 # SKIP Missing dummy x/nonexistent: 1
+  desc: "desc for test2"
+ok     6 - mismatch.sh
+not ok 7 - mismatch.sh:missing_name_2
