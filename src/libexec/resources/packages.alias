@@ -32,4 +32,4 @@ qemu: fedora:qemu-system-s390x linuxonzdriver:qemu-system-s390x ubuntu:qemu-syst
 s390-tools: ubuntu:s390-tools fedora:s390utils-base rhel:s390utils-base sles:s390-tools
 systemd-udev: ubuntu:udev
 ziomon: fedora:s390utils-ziomon rhel:s390utils-ziomon sles:s390-tools ubuntu:s390-tools
-zlib-devel: ubuntu:zlib1g-dev
+zlib-devel: ubuntu:zlib1g-dev rhel-10:zlib-ng-compat-devel
