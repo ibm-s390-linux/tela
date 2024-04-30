@@ -65,7 +65,7 @@ if [[ -z "$_TELA_COUNTING" ]] ; then
 	export _TELA_COUNTING=1
 
 	# Ensure that tela tool and generated test YAML files are present
-	$MAKE $TELA_TOOL all_check >/dev/null
+	$MAKE $TELA_TOOL all_check TESTS="$TESTS" >/dev/null
 fi
 
 counttests $TESTS
