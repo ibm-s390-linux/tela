@@ -260,6 +260,53 @@ conditions' in [Test resources](../resources.md)).
 
     Indicates that the Runtime Instrumentation Facility is available.
 
+  - **`system/firmware:`** *(type: scalar)*
+
+    Provides information about firmware.  For each
+    supported function, a section is added.
+
+  - **`system/firmware/ipl:`** *(type: scalar)*
+
+    List of supported ipl types. The list is obtained
+    from /sys/firmware/reipl/.
+
+  - **`system/firmware/ipl/ccw:`** *(type: scalar)*
+
+    Indicates that CCW IPL from ECKD/FBA DASD disks is supported.
+
+  - **`system/firmware/ipl/fcp:`** *(type: scalar)*
+
+    Indicates that the list-directed IPL from FCP disks is supported.
+
+  - **`system/firmware/ipl/nvme:`** *(type: scalar)*
+
+    Indicates that the list-directed IPL from NVMe disks is supported.
+
+  - **`system/firmware/ipl/eckd:`** *(type: scalar)*
+
+    Indicates that the list-directed IPL from ECKD DASD disks is supported.
+
+  - **`system/firmware/dump:`** *(type: scalar)*
+
+    List of supported dump types. The list is obtained
+    from /sys/firmware/dump/.
+
+  - **`system/firmware/dump/ccw:`** *(type: scalar)*
+
+    Indicates that CCW dump onto ECKD/FBA DASD disks is supported.
+
+  - **`system/firmware/dump/fcp:`** *(type: scalar)*
+
+    Indicates that the list-directed dump onto FCP disks is supported.
+
+  - **`system/firmware/dump/nvme:`** *(type: scalar)*
+
+    Indicates that the list-directed dump onto NVMe disks is supported.
+
+  - **`system/firmware/dump/eckd:`** *(type: scalar)*
+
+    Indicates that the list-directed dump onto ECKD DASD disks is supported.
+
   - **`system/mem:``**
 
     Memory information about the system.  You can use this attribute to

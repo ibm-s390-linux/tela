@@ -325,6 +325,37 @@ function get_os() {
 	done < <($TOOLDIR/../os)
 }
 
+# Get firmware information
+function get_firmware()
+{
+	local types="ccw fcp nvme eckd"
+	local emit_ipl=1 emit_dump=1 type
+
+	_emit 1 "firmware:"
+
+	for type in $types; do
+		[ -d "/sys/firmware/reipl/$type" ] || continue
+
+		if [[ "$emit_ipl" == "1" ]]; then
+			emit_ipl=0
+			_emit 2 "ipl:"
+		fi
+
+		_emit 3 "$type:"
+	done
+
+	for type in $types; do
+		[ -d "/sys/firmware/dump/$type" ] || continue
+
+		if [[ "$emit_dump" == "1" ]]; then
+			emit_dump=0
+			_emit 2 "dump:"
+		fi
+
+		_emit 3 "$type:"
+	done
+}
+
 # Remove leading space
 function strip_space() {
 	local var="$1" val indent
@@ -458,6 +489,7 @@ function get_state() {
 	get_cpu_features
 	get_cpu_facilities
 	get_cpu_mf
+	get_firmware
 	get_mem
 	get_user
 	get_os
