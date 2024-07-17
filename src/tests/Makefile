@@ -15,6 +15,7 @@ TESTS += tela_eval.sh tela_fixname.sh tela_match_sigpipe.sh
 TESTS += testexec.sh stdin.sh res/ tela.mak/ tela/ atresult.sh
 TESTS += skip_names/test.sh record_bash.sh record_get_bash.sh run_cmd.sh
 TESTS += check_fd check_fd.sh check_run_cmd.sh unit/ wildcard/
+TESTS += telarc_missing.sh
 
 check_fd.sh: check_fd
 

@@ -1,0 +1,6 @@
+test:
+  plan:
+    # Format is <testname>: "<description>"
+    basic: "Check if 'make check' writes warning about missing resource to test log file"
+    before: "Check if 'make check BEFORE=...' writes warning about missing resource to test log file"
+    after: "Check if 'make check AFTER=...' writes warning about missing resource to test log file"
