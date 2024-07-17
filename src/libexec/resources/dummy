@@ -17,14 +17,20 @@
 DATAFILE="$1"
 
 function get_state() {
-	local IFS=$'\n' count=0
+	local IFS=$'\n' count=0 id total=0 available=0
 
 	while read -r line ; do
-		# The dummy resource accepts all attributes
-		echo $line
-		[[ ${line:0:6} == "dummy " ]] && (( count++ ))
+		[[ ! "$line" =~ ^dummy' ' ]] && continue
+		(( total++ ))
+
+		# Filter out dummy IDs containing string "does_not_exit" to
+		# enable related testing.
+		[[ "$line" =~ "does_not_exist" ]] && continue
+
+		(( available++ ))
+		echo "$line"
 	done
-	echo "dummy_count_available: $count"
+	echo "dummy_count_available: $available"
 	echo "dummy_count_total: $count"
 }
 
