@@ -110,7 +110,8 @@ function runtests() {
 				fi
 
 				# Make sure warnings are passed through
-				[[ ${#err[@]} -gt 0 ]] && printf "%s\n" "${err[@]}" >&2
+				[[ ${#err[@]} -gt 0 ]] && printf "# WARNING: %s\n" "${err[@]}"
+				[[ -n "$matchout" ]] &&	grep '^# WARNING: ' "$matchout"
 			fi
 
 			# Run test

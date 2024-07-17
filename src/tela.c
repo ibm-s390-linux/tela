@@ -1086,6 +1086,7 @@ static int cmd_match(int argc, char *argv[])
 		fmt = atoi(argv[3]);
 
 	/* Perform match. */
+	is_stdout_tap = true;
 	env = res_resolve(reqfile, resfile, true, getstate, &reason,
 			  fmt == MATCH_FMT_YAML ? &matchfile : NULL);
 
